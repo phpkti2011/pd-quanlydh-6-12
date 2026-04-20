@@ -17,10 +17,12 @@ RETURNS TABLE (
     competency_score NUMERIC,
     main_task_comm NUMERIC,
     sub_task_comm NUMERIC,
-    total_comm NUMERIC
+    total_comm NUMERIC,
+    tier_percentage NUMERIC
 ) AS $$
 DECLARE
     v_total_month_sales NUMERIC := 0;
+    v_tier_pct NUMERIC := 0;
     v_transition_date DATE := '2026-03-01';
 BEGIN
     -- Calculate Total Month Sales (Pre-VAT) for Product Manager Commission
@@ -41,6 +43,9 @@ BEGIN
          AND completed_at::DATE >= p_start_date
          AND completed_at::DATE <= p_end_date)
     );
+
+    -- Get production tier rate based on total month sales
+    v_tier_pct := get_production_tier_rate(v_total_month_sales);
 
     RETURN QUERY
     -- 1. Normal Staff Commission (Existing Logic)
@@ -115,27 +120,29 @@ BEGIN
         GROUP BY pt.full_name, pt.score
     )
 
-    SELECT 
+    SELECT
         sc.p_name,
         sc.p_score,
-        ROUND(sc.p_main, 0),
-        ROUND(sc.p_sub, 0),
-        ROUND(sc.p_main + sc.p_sub, 0)
+        ROUND(sc.p_main * v_tier_pct / 100.0, 0),
+        ROUND(sc.p_sub * v_tier_pct / 100.0, 0),
+        ROUND((sc.p_main + sc.p_sub) * v_tier_pct / 100.0, 0),
+        v_tier_pct
     FROM staff_calc sc
 
     UNION ALL
 
-    -- 2. Product Manager Commission
+    -- 2. Product Manager Commission (NOT affected by production tier)
     SELECT
         p.full_name,
-        1.0 as competency_score, -- Standard score for Manager calculation context
-        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as main_task_comm, -- Put in Main Task column
+        1.0 as competency_score,
+        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as main_task_comm,
         0 as sub_task_comm,
-        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as total_comm
+        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as total_comm,
+        NULL::NUMERIC as tier_percentage
     FROM profiles p
     WHERE p.role = 'QuanLySanXuat'
     AND (p_user_name IS NULL OR p.full_name = p_user_name)
-    AND p.product_manager_commission_rate IS NOT NULL 
+    AND p.product_manager_commission_rate IS NOT NULL
     AND p.product_manager_commission_rate > 0;
     
 END;

@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Profile, SalesTarget } from '../types';
+import { commissionService } from '../services/commissionService';
+import { Profile, SalesTarget, CommissionPolicy, ProductionTierSummary } from '../types';
 import { COLORS } from '../constants';
 
 interface KPIManagerProps {
@@ -13,7 +14,7 @@ interface KPIManagerProps {
 // (Removed CommissionPolicy interface as we are moving to sales_targets)
 
 const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'employees' | 'company'>('employees'); // Removed policies tab
+    const [activeTab, setActiveTab] = useState<'employees' | 'company' | 'production'>('employees');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -266,6 +267,12 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
                         >
                             Công ty & Phòng ban
                         </button>
+                        <button
+                            onClick={() => setActiveTab('production')}
+                            className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'production' ? 'bg-white shadow text-orange-600' : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                            Sản xuất
+                        </button>
                     </div>
 
                     <button
@@ -281,7 +288,9 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
 
                 {/* Content */}
                 <div className="flex-1 overflow-auto p-6">
-                    {activeTab === 'employees' ? (
+                    {activeTab === 'production' ? (
+                        <ProductionTierTab month={selectedMonth} year={selectedYear} />
+                    ) : activeTab === 'employees' ? (
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-600 border-b">
                                 <tr>
@@ -416,6 +425,214 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
                     initialYear={selectedYear}
                 />
             )}
+        </div>
+    );
+};
+
+// Production Tier Configuration Tab
+const ProductionTierTab: React.FC<{ month: number; year: number }> = ({ month, year }) => {
+    const [tiers, setTiers] = useState<CommissionPolicy[]>([]);
+    const [summary, setSummary] = useState<ProductionTierSummary | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [editTiers, setEditTiers] = useState<{ id: string | null; threshold_min: number; threshold_max: number | null; rate: number }[]>([]);
+
+    useEffect(() => {
+        loadData();
+    }, [month, year]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [tiersData, summaryData] = await Promise.all([
+                commissionService.getProductionTiers(),
+                commissionService.getProductionCommissionSummary(month, year)
+            ]);
+            setTiers(tiersData);
+            setEditTiers(tiersData.map(t => ({
+                id: t.id,
+                threshold_min: t.threshold_min || 0,
+                threshold_max: t.threshold_max || null,
+                rate: t.rate
+            })));
+            setSummary(summaryData);
+        } catch (err) {
+            console.error('Load production tiers error:', err);
+        }
+        setLoading(false);
+    };
+
+    const formatMoney = (amount: number) => {
+        if (amount >= 1000000) return `${(amount / 1000000).toFixed(0)} triệu`;
+        return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+    };
+
+    const addTier = () => {
+        setEditTiers(prev => [...prev, { id: null, threshold_min: 0, threshold_max: null, rate: 0 }]);
+    };
+
+    const removeTier = (index: number) => {
+        setEditTiers(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updateTier = (index: number, field: string, value: number | null) => {
+        setEditTiers(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            // Delete old tiers that are no longer in the list
+            const editIds = new Set(editTiers.filter(t => t.id).map(t => t.id));
+            for (const old of tiers) {
+                if (!editIds.has(old.id)) {
+                    await commissionService.deleteProductionTier(old.id);
+                }
+            }
+            // Upsert all tiers
+            for (const tier of editTiers) {
+                await commissionService.upsertProductionTier(tier.id, {
+                    threshold_min: tier.threshold_min,
+                    threshold_max: tier.threshold_max,
+                    rate: tier.rate
+                });
+            }
+            alert('Đã lưu cấu hình mốc thưởng sản xuất!');
+            await loadData();
+        } catch (err: any) {
+            alert('Lỗi lưu: ' + err.message);
+        }
+        setSaving(false);
+    };
+
+    const getTierColor = (pct: number) => {
+        if (pct >= 150) return 'text-green-600 bg-green-50 border-green-200';
+        if (pct >= 100) return 'text-blue-600 bg-blue-50 border-blue-200';
+        if (pct >= 70) return 'text-orange-600 bg-orange-50 border-orange-200';
+        return 'text-red-600 bg-red-50 border-red-200';
+    };
+
+    if (loading) return <div className="flex justify-center py-12"><i className="fa-solid fa-spinner fa-spin text-2xl text-gray-400"></i></div>;
+
+    return (
+        <div className="space-y-6">
+            {/* Current Status Banner */}
+            {summary && (
+                <div className={`rounded-lg border-2 p-4 ${getTierColor(summary.current_tier_pct)}`}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-bold text-lg">Doanh số tháng {month}/{year}</h3>
+                            <p className="text-2xl font-bold mt-1">{formatMoney(summary.total_revenue)}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-medium opacity-75">Mốc thưởng hiện tại</p>
+                            <p className="text-3xl font-bold">{summary.current_tier_pct}%</p>
+                            {summary.current_tier_pct === 0 && (
+                                <p className="text-xs mt-1 font-medium">Chưa đạt mốc thưởng</p>
+                            )}
+                        </div>
+                    </div>
+                    {summary.next_tier_threshold && (
+                        <div className="mt-3 pt-3 border-t border-current opacity-60">
+                            <p className="text-sm">
+                                Mốc tiếp theo: <strong>{formatMoney(summary.next_tier_threshold)}</strong> → <strong>{summary.next_tier_pct}%</strong>
+                                {' '}(còn thiếu <strong>{formatMoney(summary.next_tier_threshold - summary.total_revenue)}</strong>)
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Info */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                <i className="fa-solid fa-circle-info mr-2"></i>
+                <strong>Thưởng Hoa Hồng Sản Xuất:</strong> Hệ số này nhân với tổng thưởng (CV chính + CV phụ) của nhân viên sản xuất.
+                Doanh số tính theo tổng đơn hoàn thành toàn công ty (chưa VAT).
+            </div>
+
+            {/* Tier Configuration Table */}
+            <div className="flex justify-between items-center">
+                <h3 className="font-bold text-gray-700">Cấu hình mốc thưởng</h3>
+                <button onClick={addTier} className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium">
+                    <i className="fa-solid fa-plus mr-1"></i> Thêm mốc
+                </button>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead className="bg-gray-100 border-b">
+                        <tr>
+                            <th className="px-4 py-3 text-right">Từ (Chưa VAT)</th>
+                            <th className="px-2 py-3 text-center">→</th>
+                            <th className="px-4 py-3 text-right">Đến (Chưa VAT)</th>
+                            <th className="px-4 py-3 text-center">% Hoa hồng SX</th>
+                            <th className="px-4 py-3 text-center w-16">Xóa</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {editTiers.map((tier, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-4 py-2">
+                                    <input
+                                        type="number"
+                                        className="w-full border rounded px-2 py-1.5 text-right focus:ring-2 focus:ring-orange-500 outline-none"
+                                        value={tier.threshold_min}
+                                        onChange={e => updateTier(index, 'threshold_min', parseFloat(e.target.value) || 0)}
+                                    />
+                                </td>
+                                <td className="px-2 py-2 text-center text-gray-400"><i className="fa-solid fa-arrow-right"></i></td>
+                                <td className="px-4 py-2">
+                                    <input
+                                        type="number"
+                                        className="w-full border rounded px-2 py-1.5 text-right focus:ring-2 focus:ring-orange-500 outline-none"
+                                        placeholder="∞ (không giới hạn)"
+                                        value={tier.threshold_max ?? ''}
+                                        onChange={e => updateTier(index, 'threshold_max', e.target.value ? parseFloat(e.target.value) : null)}
+                                    />
+                                </td>
+                                <td className="px-4 py-2">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <input
+                                            type="number" step="1"
+                                            className="w-20 border rounded px-2 py-1.5 text-center font-bold text-orange-600 focus:ring-2 focus:ring-orange-500 outline-none"
+                                            value={tier.rate}
+                                            onChange={e => updateTier(index, 'rate', parseFloat(e.target.value) || 0)}
+                                        />
+                                        <span className="text-gray-500 font-bold">%</span>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-2 text-center">
+                                    <button onClick={() => removeTier(index)} className="text-red-400 hover:text-red-600">
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                        {editTiers.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="py-8 text-center text-gray-400 italic">Chưa có mốc thưởng nào. Nhấn "Thêm mốc" để bắt đầu.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Note about below min threshold */}
+            <p className="text-xs text-gray-500 italic">
+                * Doanh số dưới mốc thấp nhất ({editTiers.length > 0 ? formatMoney(Math.min(...editTiers.map(t => t.threshold_min))) : '—'}) sẽ nhận 0% thưởng hoa hồng sản xuất.
+            </p>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+                <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-6 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700 shadow-sm disabled:bg-gray-400 flex items-center gap-2"
+                >
+                    {saving && <i className="fa-solid fa-spinner fa-spin"></i>}
+                    Lưu Mốc Thưởng Sản Xuất
+                </button>
+            </div>
         </div>
     );
 };

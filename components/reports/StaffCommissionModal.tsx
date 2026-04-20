@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { commissionService } from '../../services/commissionService';
-import { StaffCommissionResult } from '../../types';
+import { StaffCommissionResult, ProductionTierSummary } from '../../types';
 
 interface DetailItem {
     order_code: string;
@@ -51,6 +51,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [results, setResults] = useState<StaffCommissionResult[]>([]);
+    const [tierSummary, setTierSummary] = useState<ProductionTierSummary | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -104,8 +105,12 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             // If not admin, force userName filter
             const filterName = isAdmin ? undefined : currentUserName;
 
-            const data = await commissionService.calculateStaffCommission(startDate, endDate, filterName);
+            const [data, summary] = await Promise.all([
+                commissionService.calculateStaffCommission(startDate, endDate, filterName),
+                commissionService.getProductionCommissionSummary(selectedMonth, selectedYear)
+            ]);
             setResults(data);
+            setTierSummary(summary);
         } catch (err: any) {
             setError(err.message || 'Lỗi khi tính toán.');
         } finally {
@@ -246,6 +251,37 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                             </div>
                         )}
 
+                        {/* Production Tier Banner */}
+                        {tierSummary && results.length > 0 && (
+                            <div className={`mb-4 rounded-lg border-2 p-3 flex items-center justify-between ${
+                                tierSummary.current_tier_pct >= 150 ? 'bg-green-50 border-green-200 text-green-700' :
+                                tierSummary.current_tier_pct >= 100 ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                tierSummary.current_tier_pct >= 70 ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                                'bg-red-50 border-red-200 text-red-700'
+                            }`}>
+                                <div className="flex items-center gap-3">
+                                    <i className="fa-solid fa-chart-line text-lg"></i>
+                                    <div>
+                                        <p className="text-sm font-medium">
+                                            Doanh số tháng {selectedMonth}: <strong>{(tierSummary.total_revenue / 1000000).toFixed(0)} triệu</strong> (chưa VAT)
+                                        </p>
+                                        {tierSummary.next_tier_threshold && (
+                                            <p className="text-xs opacity-75 mt-0.5">
+                                                Mốc tiếp: {(tierSummary.next_tier_threshold / 1000000).toFixed(0)} triệu → {tierSummary.next_tier_pct}%
+                                                {' '}(còn thiếu {((tierSummary.next_tier_threshold - tierSummary.total_revenue) / 1000000).toFixed(0)} triệu)
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-2xl font-bold">×{tierSummary.current_tier_pct}%</span>
+                                    {tierSummary.current_tier_pct === 0 && (
+                                        <p className="text-xs font-medium">Chưa đạt mốc</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
@@ -253,6 +289,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên NV</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thưởng CV Chính</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thưởng CV Phụ</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Hệ số</th>
                                         <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Tổng Thưởng</th>
                                     </tr>
                                 </thead>
@@ -270,11 +307,25 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">{item.main_task_comm?.toLocaleString('vi-VN')} đ</td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-blue-600">{item.sub_task_comm?.toLocaleString('vi-VN')} đ</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                                        {item.tier_percentage != null ? (
+                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
+                                                                item.tier_percentage >= 150 ? 'bg-green-100 text-green-700' :
+                                                                item.tier_percentage >= 100 ? 'bg-blue-100 text-blue-700' :
+                                                                item.tier_percentage >= 70 ? 'bg-orange-100 text-orange-700' :
+                                                                'bg-red-100 text-red-700'
+                                                            }`}>
+                                                                ×{item.tier_percentage}%
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">—</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-700 font-bold">{((item.main_task_comm || 0) + (item.sub_task_comm || 0)).toLocaleString('vi-VN')} đ</td>
                                                 </tr>
                                                 {expandedUser === item.participant_name && (
                                                     <tr>
-                                                        <td colSpan={4} className="px-4 py-4 bg-gray-50 border-b border-gray-200">
+                                                        <td colSpan={5} className="px-4 py-4 bg-gray-50 border-b border-gray-200">
                                                             <div className="bg-white rounded border border-gray-200 overflow-hidden">
                                                                 {loadingDetails ? (
                                                                     <div className="p-4 text-center text-gray-500 text-sm">
@@ -327,7 +378,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                            <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                                                 {loading ? 'Đang tính toán...' : 'Chưa có dữ liệu. Vui lòng chọn thời gian và bấm "Tính toán".'}
                                             </td>
                                         </tr>
@@ -339,6 +390,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                             <td className="px-6 py-3">Tổng cộng</td>
                                             <td className="px-6 py-3 text-right">{results.reduce((sum, i) => sum + (i.main_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                             <td className="px-6 py-3 text-right">{results.reduce((sum, i) => sum + (i.sub_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
+                                            <td className="px-6 py-3"></td>
                                             <td className="px-6 py-3 text-right text-purple-700">{results.reduce((sum, i) => sum + (i.main_task_comm || 0) + (i.sub_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                         </tr>
                                     </tfoot>
@@ -356,6 +408,10 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                 <p><strong className="text-gray-900">2. Thưởng Công Đoạn Phụ (Thiết kế, In khổ lớn, Ép kim...):</strong></p>
                                 <p className="pl-3 font-mono text-gray-600 bg-gray-50 inline-block rounded px-1 py-0.5">
                                     Phí dịch vụ (hoặc Doanh thu) × Tỉ lệ Commission
+                                </p>
+                                <p><strong className="text-gray-900">3. Hoa Hồng Sản Xuất (Hệ số mốc doanh số):</strong></p>
+                                <p className="pl-3 font-mono text-gray-600 bg-gray-50 inline-block rounded px-1 py-0.5 mb-1">
+                                    Thưởng thực nhận = (Thưởng CV Chính + Thưởng CV Phụ) × Hệ số mốc doanh số công ty
                                 </p>
                                 <p className="mt-2 text-[10px] italic">* Tỉ lệ Commission được ưu tiên lấy theo cấu hình Cá Nhân, nếu không có sẽ lấy theo cấu hình Chung.</p>
                             </div>

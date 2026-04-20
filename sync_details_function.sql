@@ -26,15 +26,37 @@ RETURNS TABLE (
     participant_count BIGINT,
     process_comm NUMERIC, -- Commission from Process flow or Manager Sales %
     stage_comm NUMERIC,   -- Commission from Sub-task Fee
-    total_comm NUMERIC
+    total_comm NUMERIC,
+    tier_percentage NUMERIC -- Production commission tier multiplier
 ) AS $$
 DECLARE
     v_start DATE;
     v_end DATE;
+    v_total_month_sales NUMERIC := 0;
+    v_tier_pct NUMERIC := 0;
     v_transition_date DATE := '2026-03-01';
 BEGIN
     v_start := p_start_date::DATE;
     v_end := p_end_date::DATE;
+
+    -- Calculate total month sales for tier lookup
+    SELECT COALESCE(SUM(total_amount_pre_vat), 0)
+    INTO v_total_month_sales
+    FROM orders
+    WHERE status = 'HoanThanh'
+    AND (
+        (created_at::DATE < v_transition_date
+         AND created_at::DATE >= v_start
+         AND created_at::DATE <= v_end)
+        OR
+        (created_at::DATE >= v_transition_date
+         AND completed_at IS NOT NULL
+         AND completed_at::DATE >= v_start
+         AND completed_at::DATE <= v_end)
+    );
+
+    -- Get production tier rate
+    v_tier_pct := get_production_tier_rate(v_total_month_sales);
 
     RETURN QUERY
     -- 1. Regular Staff Commission Details
@@ -114,7 +136,7 @@ BEGIN
         WHERE (p_user_name IS NULL OR pt.full_name = p_user_name)
     )
 
-    SELECT 
+    SELECT
         sd.full_name,
         sd.order_code,
         sd.stage,
@@ -122,14 +144,15 @@ BEGIN
         sd.finished_at,
         sd.score,
         sd.participant_count,
-        ROUND(sd.process_comm_val, 0),
-        ROUND(sd.stage_comm_val, 0),
-        ROUND(sd.process_comm_val + sd.stage_comm_val, 0)
+        ROUND(sd.process_comm_val * v_tier_pct / 100.0, 0),
+        ROUND(sd.stage_comm_val * v_tier_pct / 100.0, 0),
+        ROUND((sd.process_comm_val + sd.stage_comm_val) * v_tier_pct / 100.0, 0),
+        v_tier_pct
     FROM staff_details sd
 
     UNION ALL
 
-    -- 2. Product Manager Commission Details
+    -- 2. Product Manager Commission Details (NOT affected by production tier)
     SELECT
         p.full_name,
         o.order_code,
@@ -140,7 +163,8 @@ BEGIN
         1 as participant_count,
         ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0), 0) as process_comm,
         0 as stage_comm,
-        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0), 0) as total_comm
+        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0), 0) as total_comm,
+        NULL::NUMERIC as tier_percentage
     FROM orders o
     CROSS JOIN profiles p
     WHERE
@@ -159,7 +183,7 @@ BEGIN
         AND p.product_manager_commission_rate IS NOT NULL
         AND p.product_manager_commission_rate > 0
         AND (p_user_name IS NULL OR p.full_name = p_user_name)
-    
+
     ORDER BY started_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

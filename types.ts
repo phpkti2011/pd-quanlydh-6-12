@@ -156,7 +156,7 @@ export interface OrderProcessParticipant {
 
 export interface CommissionPolicy {
   id: string;
-  policy_type: 'SALES_TIER' | 'GROUP_TIER' | 'SUBTASK_RATE' | 'MAINTASK_WEIGHT';
+  policy_type: 'SALES_TIER' | 'GROUP_TIER' | 'SUBTASK_RATE' | 'MAINTASK_WEIGHT' | 'PRODUCTION_TIER';
   apply_to?: string;
   threshold_min?: number;
   threshold_max?: number;
@@ -187,8 +187,17 @@ export interface StaffCommissionResult {
   main_task_comm: number;
   sub_task_comm: number;
   total_comm: number;
-  completed_sales?: number;         // NEW: Doanh số hoàn thành (cho quản lý)
-  completed_order_count?: number;   // NEW: Số đơn hoàn thành (cho quản lý)
+  tier_percentage?: number;          // Hệ số mốc thưởng sản xuất (0, 70, 100, 150)
+  completed_sales?: number;
+  completed_order_count?: number;
+}
+
+export interface ProductionTierSummary {
+  total_revenue: number;
+  current_tier_pct: number;
+  next_tier_threshold: number | null;
+  next_tier_pct: number | null;
+  all_tiers: { min: number; max: number | null; rate: number }[];
 }
 
 export interface CustomerAnalytics {

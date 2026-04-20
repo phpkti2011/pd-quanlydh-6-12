@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { SalesCommissionResult, StaffCommissionResult, CommissionPolicy } from '../types';
+import { SalesCommissionResult, StaffCommissionResult, CommissionPolicy, ProductionTierSummary } from '../types';
 
 export const commissionService = {
     /**
@@ -164,5 +164,68 @@ export const commissionService = {
 
         if (error) throw error;
         return data;
+    },
+
+    /**
+     * Get Production Commission Tiers
+     */
+    async getProductionTiers(): Promise<CommissionPolicy[]> {
+        const { data, error } = await supabase
+            .from('commission_policies')
+            .select('*')
+            .eq('policy_type', 'PRODUCTION_TIER')
+            .order('threshold_min', { ascending: true });
+
+        if (error) throw error;
+        return data as CommissionPolicy[];
+    },
+
+    /**
+     * Upsert a Production Tier
+     */
+    async upsertProductionTier(id: string | null, tier: { threshold_min: number; threshold_max: number | null; rate: number }) {
+        if (id) {
+            const { error } = await supabase
+                .from('commission_policies')
+                .update({ threshold_min: tier.threshold_min, threshold_max: tier.threshold_max, rate: tier.rate })
+                .eq('id', id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabase
+                .from('commission_policies')
+                .insert({ policy_type: 'PRODUCTION_TIER', apply_to: 'ALL', ...tier });
+            if (error) throw error;
+        }
+    },
+
+    /**
+     * Delete a Production Tier
+     */
+    async deleteProductionTier(id: string) {
+        const { error } = await supabase
+            .from('commission_policies')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    /**
+     * Get Production Commission Summary (for display & notifications)
+     */
+    async getProductionCommissionSummary(month: number, year: number): Promise<ProductionTierSummary | null> {
+        const { data, error } = await supabase.rpc('get_production_commission_summary', {
+            p_month: month,
+            p_year: year
+        });
+
+        if (error) {
+            console.error('getProductionCommissionSummary Error:', error);
+            throw error;
+        }
+
+        if (data && data.length > 0) {
+            return data[0] as ProductionTierSummary;
+        }
+        return null;
     }
 };
