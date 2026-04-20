@@ -124,8 +124,8 @@ BEGIN
     SELECT
         sc.p_name,
         sc.p_score,
-        ROUND(sc.p_main * v_tier_pct / 100.0, 0),
-        ROUND(sc.p_sub * v_tier_pct / 100.0, 0),
+        ROUND(sc.p_main, 0),
+        ROUND(sc.p_sub, 0),
         ROUND((sc.p_main + sc.p_sub) * v_tier_pct / 100.0, 0),
         v_tier_pct
     FROM staff_calc sc
@@ -136,7 +136,7 @@ BEGIN
     SELECT
         p.full_name,
         1.0 as competency_score,
-        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as main_task_comm,
+        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as main_task_comm,
         0 as sub_task_comm,
         ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as total_comm,
         v_tier_pct as tier_percentage

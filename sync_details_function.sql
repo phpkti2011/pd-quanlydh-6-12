@@ -144,8 +144,8 @@ BEGIN
         sd.finished_at,
         sd.score,
         sd.participant_count,
-        ROUND(sd.process_comm_val * v_tier_pct / 100.0, 0),
-        ROUND(sd.stage_comm_val * v_tier_pct / 100.0, 0),
+        ROUND(sd.process_comm_val, 0),
+        ROUND(sd.stage_comm_val, 0),
         ROUND((sd.process_comm_val + sd.stage_comm_val) * v_tier_pct / 100.0, 0),
         v_tier_pct
     FROM staff_details sd
@@ -161,7 +161,7 @@ BEGIN
         o.delivery_date as finished_at,
         1.0 as score,
         1 as participant_count,
-        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as process_comm,
+        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0), 0) as process_comm,
         0 as stage_comm,
         ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as total_comm,
         v_tier_pct as tier_percentage

@@ -321,7 +321,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                                             <span className="text-xs text-gray-400">—</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-700 font-bold">{((item.main_task_comm || 0) + (item.sub_task_comm || 0)).toLocaleString('vi-VN')} đ</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-700 font-bold">{(item.total_comm || 0).toLocaleString('vi-VN')} đ</td>
                                                 </tr>
                                                 {expandedUser === item.participant_name && (
                                                     <tr>
@@ -391,7 +391,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                             <td className="px-6 py-3 text-right">{results.reduce((sum, i) => sum + (i.main_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                             <td className="px-6 py-3 text-right">{results.reduce((sum, i) => sum + (i.sub_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                             <td className="px-6 py-3"></td>
-                                            <td className="px-6 py-3 text-right text-purple-700">{results.reduce((sum, i) => sum + (i.main_task_comm || 0) + (i.sub_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
+                                            <td className="px-6 py-3 text-right text-purple-700">{results.reduce((sum, i) => sum + (i.total_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                         </tr>
                                     </tfoot>
                                 )}
