@@ -132,14 +132,14 @@ BEGIN
 
     UNION ALL
 
-    -- 2. Product Manager Commission (NOT affected by production tier)
+    -- 2. Product Manager Commission (also affected by production tier)
     SELECT
         p.full_name,
         1.0 as competency_score,
-        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as main_task_comm,
+        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as main_task_comm,
         0 as sub_task_comm,
-        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0), 0) as total_comm,
-        NULL::NUMERIC as tier_percentage
+        ROUND(v_total_month_sales * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as total_comm,
+        v_tier_pct as tier_percentage
     FROM profiles p
     WHERE p.role = 'QuanLySanXuat'
     AND (p_user_name IS NULL OR p.full_name = p_user_name)

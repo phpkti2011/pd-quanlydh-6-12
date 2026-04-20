@@ -152,7 +152,7 @@ BEGIN
 
     UNION ALL
 
-    -- 2. Product Manager Commission Details (NOT affected by production tier)
+    -- 2. Product Manager Commission Details (also affected by production tier)
     SELECT
         p.full_name,
         o.order_code,
@@ -161,10 +161,10 @@ BEGIN
         o.delivery_date as finished_at,
         1.0 as score,
         1 as participant_count,
-        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0), 0) as process_comm,
+        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as process_comm,
         0 as stage_comm,
-        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0), 0) as total_comm,
-        NULL::NUMERIC as tier_percentage
+        ROUND(o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0) * v_tier_pct / 100.0, 0) as total_comm,
+        v_tier_pct as tier_percentage
     FROM orders o
     CROSS JOIN profiles p
     WHERE
