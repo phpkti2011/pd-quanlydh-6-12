@@ -191,9 +191,11 @@ export const commissionService = {
                 .eq('id', id);
             if (error) throw error;
         } else {
+            // apply_to must be unique per policy_type, use timestamp to generate unique key
+            const applyTo = `TIER_${Date.now()}`;
             const { error } = await supabase
                 .from('commission_policies')
-                .insert({ policy_type: 'PRODUCTION_TIER', apply_to: 'ALL', ...tier });
+                .insert({ policy_type: 'PRODUCTION_TIER', apply_to: applyTo, ...tier });
             if (error) throw error;
         }
     },

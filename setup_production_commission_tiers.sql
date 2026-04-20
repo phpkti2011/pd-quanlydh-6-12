@@ -13,10 +13,10 @@ DELETE FROM commission_policies WHERE policy_type = 'PRODUCTION_TIER';
 
 INSERT INTO commission_policies (id, policy_type, apply_to, threshold_min, threshold_max, rate)
 VALUES
-    (uuid_generate_v4(), 'PRODUCTION_TIER', 'ALL', 550000000, 650000000, 70),
-    (uuid_generate_v4(), 'PRODUCTION_TIER', 'ALL', 650000000, 750000000, 100),
-    (uuid_generate_v4(), 'PRODUCTION_TIER', 'ALL', 750000000, 850000000, 150),
-    (uuid_generate_v4(), 'PRODUCTION_TIER', 'ALL', 850000000, NULL, 150);
+    (uuid_generate_v4(), 'PRODUCTION_TIER', 'TIER_1', 550000000, 650000000, 70),
+    (uuid_generate_v4(), 'PRODUCTION_TIER', 'TIER_2', 650000000, 750000000, 100),
+    (uuid_generate_v4(), 'PRODUCTION_TIER', 'TIER_3', 750000000, 850000000, 150),
+    (uuid_generate_v4(), 'PRODUCTION_TIER', 'TIER_4', 850000000, NULL, 150);
 
 -- 2. Helper function: get_production_tier_rate
 -- Trả về % thưởng sản xuất dựa trên doanh số
