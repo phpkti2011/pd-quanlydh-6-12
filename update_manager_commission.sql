@@ -7,6 +7,7 @@ BEGIN
 END $$;
 
 -- 2. Update calculate_staff_commission to include Product Manager logic
+DROP FUNCTION IF EXISTS calculate_staff_commission(DATE, DATE, TEXT);
 CREATE OR REPLACE FUNCTION calculate_staff_commission(
     p_start_date DATE,
     p_end_date DATE,
