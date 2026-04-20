@@ -106,9 +106,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 4. Admin function to save production tiers (bypasses RLS)
-CREATE OR REPLACE FUNCTION save_production_tiers(p_tiers JSONB)
+DROP FUNCTION IF EXISTS save_production_tiers(JSONB);
+CREATE OR REPLACE FUNCTION save_production_tiers(p_tiers TEXT)
 RETURNS void AS $$
+DECLARE
+    v_tiers JSONB;
 BEGIN
+    v_tiers := p_tiers::JSONB;
+
     -- Delete all existing production tiers
     DELETE FROM commission_policies WHERE policy_type = 'PRODUCTION_TIER';
 
@@ -121,7 +126,7 @@ BEGIN
         (elem->>'min')::NUMERIC,
         CASE WHEN elem->>'max' = '' OR elem->>'max' IS NULL THEN NULL ELSE (elem->>'max')::NUMERIC END,
         (elem->>'rate')::NUMERIC
-    FROM jsonb_array_elements(p_tiers) AS elem;
+    FROM jsonb_array_elements(v_tiers) AS elem;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
