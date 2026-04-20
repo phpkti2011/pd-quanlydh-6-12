@@ -1,0 +1,15 @@
+*.zip
+*.mp4
+backups/
+Video/
+*.sql
+*.log
+*.txt
+*.bat
+*.ps1
+appscript/
+data/
+scripts/
+*.bak
+*.tmp
+temp_logo_base64.txt
