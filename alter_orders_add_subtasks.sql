@@ -1,0 +1,27 @@
+-- Add missing sub-task columns to orders table
+ALTER TABLE orders 
+ADD COLUMN IF NOT EXISTS has_be_demi BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS be_demi_fee NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS has_gia_cong_ngoai BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS gia_cong_ngoai_fee NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS has_ep_kim BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS ep_kim_fee NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS has_can_mang BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS can_mang_fee NUMERIC DEFAULT 0,
+
+-- Add Status Columns
+ADD COLUMN IF NOT EXISTS design_status TEXT DEFAULT 'Pending',
+ADD COLUMN IF NOT EXISTS large_print_status TEXT DEFAULT 'Pending',
+ADD COLUMN IF NOT EXISTS be_demi_status TEXT DEFAULT 'Pending',
+ADD COLUMN IF NOT EXISTS outsource_status TEXT DEFAULT 'Pending',
+ADD COLUMN IF NOT EXISTS ep_kim_status TEXT DEFAULT 'Pending',
+
+-- Add Note Columns
+ADD COLUMN IF NOT EXISTS design_note TEXT,
+ADD COLUMN IF NOT EXISTS large_print_note TEXT,
+ADD COLUMN IF NOT EXISTS be_demi_note TEXT,
+ADD COLUMN IF NOT EXISTS outsource_note TEXT,
+ADD COLUMN IF NOT EXISTS ep_kim_note TEXT;
+
+-- Refresh schema cache
+NOTIFY pgrst, 'reload schema';

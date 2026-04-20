@@ -1,0 +1,2952 @@
+/**
+ * File: Mã.gs (Phiên bản 28.1 - Nâng cấp Hiển thị Mốc thưởng & Export)
+ * - Tác giả: Gemini Expert
+ * - Ngày cập nhật: 05/11/2025
+ * - Mô tả:
+ * 1. [NÂNG CẤP] Hàm calculateSalesCommission trả về chi tiết chính sách để hiển thị trên UI.
+ * 2. [TÍNH NĂNG MỚI] Thêm hàm exportAllCommissions để xuất báo cáo tổng hợp (Admin).
+ * 3. [BẢO MẬT] Giữ nguyên logic phân quyền cho chức năng xem thưởng.
+ * 4. [ỔN ĐỊNH] Giữ nguyên logic Tab Hóa đơn và các chức năng cốt lõi khác.
+ */
+
+// =================================================================================
+// CÀI ĐẶT CHUNG VÀ BIẾN TOÀN CỤC
+// =================================================================================
+
+const TEMPLATE_ID = "131UDimHkCv9iUnCG_IQriJ-k-N1iO10B0vKLwLLnteE";
+const DELIVERY_NOTE_TEMPLATE_ID = "10YGcOdQ0ZTVnBukncvdWomCSiiMVWB3QChUjDfAYyAU";
+const TRACKING_URL_BASE = "https://script.google.com/macros/s/AKfycbyHl81ubRFfRR_9uZYKicvklt-hNk5TepQuL64r8LBKhKovRr4agzBeXJ80P13hjZhLTA/exec";
+const TIMEZONE = "Asia/Ho_Chi_Minh";
+
+// ... (Các hằng số cột COL_DH_... giữ nguyên) ...
+const COL_DH_THOI_GIAN_TAO = 0,
+      COL_DH_TEN_KH = 1,
+      COL_DH_MA_KH = 2,
+      COL_DH_MA_DON = 3,
+      COL_DH_QUY_CACH = 4,
+      COL_DH_GHI_CHU_DON_HANG = 5,
+      COL_DH_TONG_TIEN_TRUOC_VAT = 6,
+      COL_DH_VAT_RATE = 7,
+      COL_DH_TIEN_VAT = 8,
+      COL_DH_TONG_TIEN_SAU_VAT = 9,
+      COL_DH_THONG_TIN_XUAT_HOA_DON = 10,
+      COL_DH_TRANG_THAI_XUAT_HOA_DON = 11,
+      COL_DH_THANH_TOAN = 12,
+      COL_DH_NHAN_VIEN = 13,
+      COL_DH_NGUON_KH = 14,
+      COL_DH_GIAO_HANG = 15,
+      COL_DH_UU_TIEN = 16,
+      COL_DH_DIA_CHI = 17,
+      COL_DH_TINH_TRANG = 18,
+      COL_DH_THIET_KE = 19,
+      COL_DH_THIET_KE_STATUS = 20,
+      COL_DH_THIET_KE_NOTE = 21,
+      COL_DH_PHI_THIET_KE = 22,
+      COL_DH_IN_KHO_LON = 23,
+      COL_DH_PHI_IN_KHO_LON = 24,
+      COL_DH_IN_KHO_LON_STATUS = 25,
+      COL_DH_IN_KHO_LON_NOTE = 26,
+      COL_DH_BE_DEMI = 27,
+      COL_DH_BE_DEMI_STATUS = 28,
+      COL_DH_BE_DEMI_NOTE = 29,
+      COL_DH_GIA_CONG_NGOAI = 30,
+      COL_DH_GIA_CONG_NGOAI_STATUS = 31,
+      COL_DH_GIA_CONG_NGOAI_NOTE = 32,
+      COL_DH_EP_KIM = 33,
+      COL_DH_EP_KIM_STATUS = 34,
+      COL_DH_EP_KIM_NOTE = 35,
+      COL_DH_GHI_CHU_TRANG_THAI = 36,
+      COL_DH_TIEN_COC = 37,
+      COL_DH_TIEN_CON_LAI = 38,
+      COL_DH_HINH_THUC_TT = 39,
+      COL_DH_XAC_NHAN_TT = 40,
+      COL_DH_NGUOI_XAC_NHAN_TT = 41,
+      COL_DH_TG_XAC_NHAN_TT = 42,
+      COL_DH_MA_THEO_DOI = 43,
+      COL_DH_HINH_THUC_TT_COC = 44,
+      COL_DH_HINH_THUC_TT_CONLAI = 45,
+      COL_DH_GHI_CHU_TT = 46,
+      COL_DH_BINH_FILE_PARTICIPANTS = 47,
+      COL_DH_IN_PARTICIPANTS = 48,
+      COL_DH_THANH_PHAM_PARTICIPANTS = 49,
+      COL_DH_THIET_KE_NGUOI_HT = 50,
+      COL_DH_THIET_KE_TG_HT = 51,
+      COL_DH_IN_KHO_LON_NGUOI_HT = 52,
+      COL_DH_IN_KHO_LON_TG_HT = 53,
+      COL_DH_BE_DEMI_NGUOI_HT = 54,
+      COL_DH_BE_DEMI_TG_HT = 55,
+      COL_DH_GIA_CONG_NGOAI_NGUOI_HT = 56,
+      COL_DH_GIA_CONG_NGOAI_TG_HT = 57,
+      COL_DH_EP_KIM_NGUOI_HT = 58,
+      COL_DH_EP_KIM_TG_HT = 59,
+      COL_DH_BINH_FILE_PARTICIPANTS_DATA = 60,
+      COL_DH_IN_PARTICIPANTS_DATA = 61,
+      COL_DH_THANH_PHAM_PARTICIPANTS_DATA = 62;
+
+
+const COL_LS_TIMESTAMP = 0, COL_LS_USER = 1, COL_LS_ACTION = 2, COL_LS_DETAIL = 3, COL_LS_OLD_DATA = 4, COL_LS_NEW_DATA = 5;
+const COL_KH_MA_KH = 0, COL_KH_TEN_KH = 1, COL_KH_SDT = 2, COL_KH_DIA_CHI = 3, COL_KH_EMAIL = 4, COL_KH_NGUON_KH = 5, COL_KH_GHI_CHU_CRM = 6;
+const CACHE_EXPIRATION_SECONDS = 300; 
+
+// ... (Các hàm doGet, getTrackingUrlBase, clearCache, tiện ích, lấy dữ liệu và quyền giữ nguyên) ...
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('Ordermanager').evaluate().setTitle('Quản lý đơn hàng P&D');
+}
+
+function getTrackingUrlBase() {
+  return TRACKING_URL_BASE;
+}
+
+function clearCache() {
+  const cache = CacheService.getScriptCache();
+  cache.removeAll(['dashboard_stats', 'order_counts', 'users_info', 'permissions_data']);
+}
+
+// =================================================================================
+// HÀM TIỆN ÍCH
+// =================================================================================
+
+function getNowInVnTimezone() {
+  const formattedDateString = Utilities.formatDate(new Date(), TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss");
+  return new Date(formattedDateString);
+}
+
+function htmlToPlainText(html) {
+  if (!html) return '';
+  let text = html.replace(/<p>/gi, '').replace(/<\/p>/gi, '\n').replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<[^>]*>/g, '');
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  return text.trim().replace(/\n\s*\n/g, '\n');
+}
+
+function plainTextToHtml(text) {
+  if (!text) return '';
+  let safeText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return '<p>' + safeText.split('\n').join('</p><p>') + '</p>';
+}
+
+// =================================================================================
+// HÀM LẤY DỮ LIỆU VÀ QUYỀN
+// =================================================================================
+
+/**
+ * [MỚI] Lấy và cache dữ liệu phân quyền từ sheet 'PhanQuyenCongDoan'.
+ * @returns {Object} Một object với key là tên nhân viên và value là quyền của họ.
+ */
+function _getPermissionsData() {
+    const cache = CacheService.getScriptCache();
+    const cachedPermissions = cache.get('permissions_data');
+    if (cachedPermissions) {
+        return JSON.parse(cachedPermissions);
+    }
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('PhanQuyenCongDoan');
+    if (!sheet) return {};
+
+    const permissions = {};
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+        const name = (data[i][0] || '').trim();
+        if (name) {
+            permissions[name] = {
+                allowedStages: (data[i][1] || '').split(',').map(s => s.trim()).filter(Boolean),
+                allowedStatuses: (data[i][2] || '').split(',').map(s => s.trim()).filter(Boolean)
+            };
+        }
+    }
+
+    cache.put('permissions_data', JSON.stringify(permissions), CACHE_EXPIRATION_SECONDS * 2);
+    return permissions;
+}
+
+function getUsersInfo() {
+  const cache = CacheService.getScriptCache();
+  const cachedUsers = cache.get('users_info');
+  if (cachedUsers) {
+    return JSON.parse(cachedUsers);
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Quyen');
+  if (!sheet) return {};
+  
+  const users = {};
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const email = (data[i][0] || '').trim().toLowerCase();
+    if (email) {
+      users[email] = {
+        name: (data[i][2] || '').trim(),
+        role: (data[i][1] || 'Khách').trim()
+      };
+    }
+  }
+  
+  cache.put('users_info', JSON.stringify(users), CACHE_EXPIRATION_SECONDS * 2);
+  return users;
+}
+
+/**
+ * [NÂNG CẤP] Lấy thông tin, vai trò và quyền hạn chi tiết của người dùng hiện tại.
+ */
+function getCurrentUserRole() {
+  const email = Session.getActiveUser().getEmail();
+  const defaultRoleInfo = { 
+      email: email, 
+      role: "Khách", 
+      name: email, 
+      defaultTab: "Tất cả", 
+      canEditTasks: false,
+      permissions: { allowedStages: [], allowedStatuses: [] } 
+  };
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Quyen');
+    if (!sheet) return defaultRoleInfo;
+    
+    const allPermissions = _getPermissionsData();
+    const data = sheet.getDataRange().getValues();
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toLowerCase() === email.toLowerCase()) {
+        const userRole = data[i][1] || "Khách";
+        const userName = data[i][2] || email;
+        const canEditTasks = checkTaskEditPermission(userRole);
+        let userPermissions = allPermissions[userName] || { allowedStages: [], allowedStatuses: [] };
+
+        // Admin có mọi quyền
+        if (userRole === 'Admin') {
+            const allStages = ["Thiết kế", "Bình File", "In", "Thành Phẩm", "In Khổ Lớn", "Bế Demi", "Gia công ngoài", "Ép Kim"];
+            const allStatuses = ["Nhận File", "Xử lý File", "Bình File", "In", "Thành Phẩm", "Đóng gói", "Chờ giao hàng", "Tạm ngưng", "Đã giao hàng", "Đã hoàn thành", "Đã hủy"];
+            userPermissions = { allowedStages: allStages, allowedStatuses: allStatuses };
+        }
+
+        return { 
+          email: email, 
+          role: userRole, 
+          name: userName, 
+          defaultTab: data[i][3] || "Tất cả",
+          canEditTasks: canEditTasks,
+          permissions: userPermissions
+        };
+      }
+    }
+  } catch (e) { logAction("Lỗi lấy quyền", e.message, {}, {}); }
+  return defaultRoleInfo;
+}
+
+
+function getOrderHistory(maDon) {
+  if (!maDon) return [];
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Lichsu');
+    if (!sheet) throw new Error("Sheet 'Lichsu' không tồn tại.");
+    
+    const usersInfo = getUsersInfo();
+    const data = sheet.getDataRange().getValues();
+    const history = [];
+    
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (data[i][COL_LS_DETAIL] === maDon) {
+        const userEmail = (data[i][COL_LS_USER] || '').trim().toLowerCase();
+        const userInfo = usersInfo[userEmail] || { name: userEmail, role: 'Không xác định' };
+
+        history.push({
+          timestamp: (data[i][COL_LS_TIMESTAMP] instanceof Date) ? Utilities.formatDate(data[i][COL_LS_TIMESTAMP], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : data[i][COL_LS_TIMESTAMP],
+          user: userEmail,
+          userName: userInfo.name,
+          userRole: userInfo.role,
+          action: data[i][COL_LS_ACTION],
+          oldData: data[i][COL_LS_OLD_DATA],
+          newData: data[i][COL_LS_NEW_DATA]
+        });
+      }
+    }
+    return history;
+  } catch (e) {
+    logAction("Lỗi lấy lịch sử", e.message, {maDon: maDon}, {});
+    return [];
+  }
+}
+
+function getCustomerHistory(maKH) {
+  if (!maKH) return [];
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) {
+    throw new Error("Bạn không có quyền xem lịch sử khách hàng.");
+  }
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LichsuKhachhang');
+    if (!sheet) return [];
+    
+    const usersInfo = getUsersInfo();
+    const data = sheet.getDataRange().getValues();
+    const history = [];
+    
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (data[i][0] === maKH) { 
+        const userEmail = (data[i][2] || '').trim().toLowerCase();
+        const userInfo = usersInfo[userEmail] || { name: userEmail, role: 'Không xác định' };
+
+        history.push({
+          timestamp: (data[i][1] instanceof Date) ? Utilities.formatDate(data[i][1], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : data[i][1],
+          userName: userInfo.name,
+          oldData: data[i][3],
+          newData: data[i][4]
+        });
+      }
+    }
+    return history;
+  } catch (e) {
+    logAction("Lỗi lấy lịch sử KH", e.message, { maKH: maKH }, {});
+    return [];
+  }
+}
+
+function getSalesEmployees() {
+  const userRoleInfo = getCurrentUserRole();
+  // Bất kỳ ai cũng có thể lấy danh sách này để lọc, nhưng quyền truy cập báo cáo sẽ được kiểm soát ở hàm khác
+  // [CẬP NHẬT V28.1] Mở quyền cho tất cả để populate dropdown, hàm tính toán sẽ kiểm tra quyền
+  // if (!checkPermission(userRoleInfo.role, ["Admin", "Kế toán", "Nhân Viên Kinh Doanh"])) {
+  //   return [];
+  // }
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Quyen');
+    if (!sheet) return [];
+    const data = sheet.getDataRange().getValues();
+    const employees = [];
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1] && data[i][1].toLowerCase().trim() === 'nhân viên kinh doanh' && data[i][2]) {
+        employees.push(data[i][2].trim());
+      }
+    }
+    return [...new Set(employees)].sort();
+  } catch (e) {
+    logAction("Lỗi lấy danh sách NV", e.message, {}, {});
+    return [];
+  }
+}
+
+function getAllEmployees() {
+  const userRoleInfo = getCurrentUserRole();
+  // Giới hạn quyền truy cập danh sách tất cả nhân viên
+  // [CẬP NHẬT V28.1] Mở quyền cho tất cả để populate dropdown, hàm tính toán sẽ kiểm tra quyền
+  // if (!checkPermission(userRoleInfo.role, ["Admin", "Kế toán"])) {
+  //   return [];
+  // }
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Quyen');
+    if (!sheet) return [];
+    const data = sheet.getDataRange().getValues();
+    const employees = [];
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][2]) {
+        employees.push(data[i][2].trim());
+      }
+    }
+    return [...new Set(employees)].sort();
+  } catch (e) {
+    logAction("Lỗi lấy DS tất cả NV", e.message, {}, {});
+    return [];
+  }
+}
+
+
+function getOrderCounts() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('order_counts');
+  if (cached != null) {
+    return JSON.parse(cached);
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) return {};
+  
+  const counts = {
+    "Tất cả": 0, "Nhận File": 0, "Xử lý File": 0, "Bình File": 0, "In": 0, 
+    "Thành Phẩm": 0, "Đóng gói": 0, "Chờ giao hàng": 0, "Đã giao hàng": 0, 
+    "Đã hoàn thành": 0, "Xuất hóa đơn": 0, "Gấp": 0, "Đã hủy": 0, "Tạm ngưng": 0,
+    "Thiết Kế": 0, "In Khổ Lớn": 0, "Bế Demi": 0, "Gia công ngoài": 0, "Ép Kim": 0,
+    "ThietKe_uncompleted": 0, "ThietKe_completed": 0,
+    "InKhoLon_uncompleted": 0, "InKhoLon_completed": 0,
+    "BeDemi_uncompleted": 0, "BeDemi_completed": 0,
+    "Giacongngoai_uncompleted": 0, "Giacongngoai_completed": 0,
+    "EpKim_uncompleted": 0, "EpKim_completed": 0,
+    // [THAY ĐỔI V27] Thêm bộ đếm chi tiết cho Xuất hóa đơn
+    "Xuathoadon_uncompleted": 0, "Xuathoadon_completed": 0 
+  };
+  
+  const data = sheet.getDataRange().getValues().slice(1);
+  
+  data.forEach(row => {
+    if (!row[COL_DH_MA_DON]) return;
+    
+    counts["Tất cả"]++;
+    
+    const status = (row[COL_DH_TINH_TRANG] || '').trim();
+    const invoiceStatus = (row[COL_DH_TRANG_THAI_XUAT_HOA_DON] || '').trim();
+    const isMainCompleted = (status === 'Đã hoàn thành' || status === 'Đã giao hàng');
+
+    if (status && counts.hasOwnProperty(status)) {
+       counts[status]++; 
+    }
+    
+    if (status === 'Đã giao hàng') {
+        counts["Đã hoàn thành"]++;
+    }
+    
+    // [THAY ĐỔI V27] Cập nhật logic đếm hóa đơn
+    if (invoiceStatus === 'Chưa xuất') {
+      counts["Xuathoadon_uncompleted"]++;
+    } else if (invoiceStatus === 'Đã xuất') {
+      counts["Xuathoadon_completed"]++;
+    }
+
+    if (status !== 'Đã hủy' && !isMainCompleted) {
+      if ((row[COL_DH_UU_TIEN] || '').toString().trim() === 'Gấp') counts["Gấp"]++;
+    }
+
+    if (status !== 'Đã hủy') {
+        if ((row[COL_DH_THIET_KE] || '').toString().trim() === 'Có') {
+            if ((row[COL_DH_THIET_KE_STATUS] || '').trim() === 'Đã hoàn thành') counts.ThietKe_completed++;
+            else counts.ThietKe_uncompleted++;
+        }
+        if ((row[COL_DH_IN_KHO_LON] || '').toString().trim() === 'Có') {
+            if ((row[COL_DH_IN_KHO_LON_STATUS] || '').trim() === 'Đã hoàn thành') counts.InKhoLon_completed++;
+            else counts.InKhoLon_uncompleted++;
+        }
+        if ((row[COL_DH_BE_DEMI] || '').toString().trim() === 'Có') {
+            if ((row[COL_DH_BE_DEMI_STATUS] || '').trim() === 'Đã hoàn thành') counts.BeDemi_completed++;
+            else counts.BeDemi_uncompleted++;
+        }
+        if ((row[COL_DH_GIA_CONG_NGOAI] || '').toString().trim() === 'Có') {
+            if ((row[COL_DH_GIA_CONG_NGOAI_STATUS] || '').trim() === 'Đã hoàn thành') counts.Giacongngoai_completed++;
+            else counts.Giacongngoai_uncompleted++;
+        }
+        if ((row[COL_DH_EP_KIM] || '').toString().trim() === 'Có') {
+            if ((row[COL_DH_EP_KIM_STATUS] || '').trim() === 'Đã hoàn thành') counts.EpKim_completed++;
+            else counts.EpKim_uncompleted++;
+        }
+    }
+  });
+  
+  // [THAY ĐỔI V27] Đặt số đếm cho tab chính "Xuất hóa đơn" là số đơn "Chưa xuất"
+  counts["Xuất hóa đơn"] = counts.Xuathoadon_uncompleted;
+  counts["Thiết Kế"] = counts.ThietKe_uncompleted;
+  counts["In Khổ Lớn"] = counts.InKhoLon_uncompleted;
+  counts["Bế Demi"] = counts.BeDemi_uncompleted;
+  counts["Gia công ngoài"] = counts.Giacongngoai_uncompleted;
+  counts["Ép Kim"] = counts.EpKim_uncompleted;
+
+  cache.put('order_counts', JSON.stringify(counts), CACHE_EXPIRATION_SECONDS);
+  return counts;
+}
+
+function getLogoutUrl() {
+  const webAppUrl = ScriptApp.getService().getUrl();
+  return `https://www.google.com/accounts/Logout?continue=https://appengine.google.com/_ah/logout?continue=${encodeURIComponent(webAppUrl)}`;
+}
+
+function checkPermission(userRole, allowedRoles) {
+  return allowedRoles.map(r => r.toLowerCase().trim()).includes((userRole || '').toLowerCase().trim());
+}
+
+
+function checkTaskEditPermission(userRole) {
+  const allowedRoles = ["Admin", "Nhân viên Sản Xuất", "Nhân viên Thiết Kế", "Nhân viên Bình File", "Kế toán"];
+  return checkPermission(userRole, allowedRoles);
+}
+
+function getCustomerDetails(maKH) {
+  if (!maKH) return null;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Khachhang');
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  const maKHTrimmed = maKH.toString().trim();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][COL_KH_MA_KH] && data[i][COL_KH_MA_KH].toString().trim() === maKHTrimmed) {
+      return { 
+        maKH: data[i][COL_KH_MA_KH], 
+        tenKH: data[i][COL_KH_TEN_KH], 
+        sdt: data[i][COL_KH_SDT], 
+        diachi: data[i][COL_KH_DIA_CHI], 
+        email: data[i][COL_KH_EMAIL],
+        nguonKH: data[i][COL_KH_NGUON_KH] || '',
+        ghiChuCRM: data[i][COL_KH_GHI_CHU_CRM] || ''
+      };
+    }
+  }
+  return null;
+}
+
+function getOrders(options) {
+  // [THAY ĐỔI V27] Thêm invoiceStatusFilter
+  const { page = 1, pageSize = 25, statusFilter = '', searchTerm = '', sortOption = 'thoigiantao-desc', startDate, endDate, isUrgentFilter, isAllTabFilter, isInvoiceExportFilter, mainCompletionStatus, taskStatusFilter, confirmationStatusFilter, confirmedByFilter, salespersonFilter, invoiceStatusFilter } = options;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) return { orders: [], totalItems: 0 };
+  
+  const allData = sheet.getDataRange().getValues().slice(1);
+  const searchTermLower = searchTerm.toLowerCase();
+  
+  const startDateObj = startDate ? new Date(startDate + 'T00:00:00') : null;
+  const endDateObj = endDate ? new Date(endDate + 'T23:59:59') : null;
+  
+  const currentUser = getCurrentUserRole();
+
+  const filteredData = allData.filter(row => {
+    if (!row[COL_DH_MA_DON]) return false;
+    
+    if (salespersonFilter) {
+      const orderSalesperson = (row[COL_DH_NHAN_VIEN] || '').trim();
+      if (salespersonFilter === 'my_orders') {
+        if (orderSalesperson !== currentUser.name) return false;
+      } else {
+        if (orderSalesperson !== salespersonFilter) return false;
+      }
+    }
+
+    const xacNhanTT = (row[COL_DH_XAC_NHAN_TT] || '').trim();
+    if (confirmationStatusFilter) {
+      const paymentStatus = (row[COL_DH_THANH_TOAN] || '').trim();
+      const needsConfirmation = paymentStatus === 'Đã cọc' || paymentStatus === 'Đã thanh toán';
+      if (confirmationStatusFilter === 'Đã xác nhận' && xacNhanTT !== 'Đã xác nhận') return false;
+      if (confirmationStatusFilter === 'Chưa xác nhận' && (!needsConfirmation || xacNhanTT === 'Đã xác nhận')) return false;
+    }
+    if (confirmedByFilter && (row[COL_DH_NGUOI_XAC_NHAN_TT] || '').trim() !== confirmedByFilter) {
+      return false;
+    }
+
+    const tinhtrang = (row[COL_DH_TINH_TRANG] || '').toString().trim();
+    const createDate = row[COL_DH_THOI_GIAN_TAO] instanceof Date ? row[COL_DH_THOI_GIAN_TAO] : null;
+
+    const isMainCompleted = (tinhtrang === 'Đã hoàn thành' || tinhtrang === 'Đã giao hàng');
+    const isCancelled = tinhtrang === 'Đã hủy';
+    if (mainCompletionStatus === 'completed' && !isMainCompleted) return false;
+    if (mainCompletionStatus === 'uncompleted' && (isMainCompleted || isCancelled)) return false;
+
+    if (taskStatusFilter && taskStatusFilter.task) {
+        let taskRequiredCol, taskStatusCol;
+        switch(taskStatusFilter.task) {
+            case 'ThietKe': taskRequiredCol = COL_DH_THIET_KE; taskStatusCol = COL_DH_THIET_KE_STATUS; break;
+            case 'InKhoLon': taskRequiredCol = COL_DH_IN_KHO_LON; taskStatusCol = COL_DH_IN_KHO_LON_STATUS; break;
+            case 'BeDemi': taskRequiredCol = COL_DH_BE_DEMI; taskStatusCol = COL_DH_BE_DEMI_STATUS; break;
+            case 'Giacongngoai': taskRequiredCol = COL_DH_GIA_CONG_NGOAI; taskStatusCol = COL_DH_GIA_CONG_NGOAI_STATUS; break;
+            case 'EpKim': taskRequiredCol = COL_DH_EP_KIM; taskStatusCol = COL_DH_EP_KIM_STATUS; break;
+            default: return false;
+        }
+        
+        if ((row[taskRequiredCol] || '').toString().trim() !== 'Có') return false;
+        
+        const isTaskCompleted = (row[taskStatusCol] || '').toString().trim() === 'Đã hoàn thành';
+        if (taskStatusFilter.status === 'completed' && !isTaskCompleted) return false;
+        if (taskStatusFilter.status === 'uncompleted' && isTaskCompleted) return false;
+    }
+
+    if (!isAllTabFilter) {
+        // [THAY ĐỔI V27] Cập nhật logic lọc hóa đơn
+        if (isInvoiceExportFilter) {
+            const invoiceStatus = (row[COL_DH_TRANG_THAI_XUAT_HOA_DON] || '').trim();
+            // Lọc theo sub-tab (Chua xuat / Da xuat)
+            if (invoiceStatusFilter === 'Chua xuat' && invoiceStatus !== 'Chưa xuất') {
+                return false;
+            }
+            if (invoiceStatusFilter === 'Da xuat' && invoiceStatus !== 'Đã xuất') {
+                return false;
+            }
+        } else if (isUrgentFilter) {
+            if ((row[COL_DH_UU_TIEN] || '').toString().trim() !== 'Gấp' || isMainCompleted || isCancelled) {
+                return false;
+            }
+        } else if (statusFilter) {
+            if (tinhtrang !== statusFilter) {
+                return false;
+            }
+        }
+    }
+   
+    if (startDateObj && (!createDate || createDate < startDateObj)) return false;
+    if (endDateObj && (!createDate || createDate > endDateObj)) return false;
+    
+    const searchableContent = [
+        row[COL_DH_MA_DON], row[COL_DH_TEN_KH], row[COL_DH_MA_KH], 
+        row[COL_DH_QUY_CACH], row[COL_DH_GHI_CHU_DON_HANG], row[COL_DH_GHI_CHU_TRANG_THAI],
+        row[COL_DH_THIET_KE_NOTE], row[COL_DH_IN_KHO_LON_NOTE], row[COL_DH_BE_DEMI_NOTE],
+        row[COL_DH_GIA_CONG_NGOAI_NOTE], row[COL_DH_EP_KIM_NOTE], row[COL_DH_THONG_TIN_XUAT_HOA_DON]
+    ].join(' ').replace(/<[^>]*>/g, ' ').toLowerCase();
+    if (searchTermLower && !searchableContent.includes(searchTermLower)) return false;
+
+    return true;
+  });
+
+  const [sortColumn, sortOrder] = (sortOption || 'thoigiantao-desc').split('-');
+  const sortKeyMap = { 'madon': COL_DH_MA_DON, 'tenKH': COL_DH_TEN_KH, 'tongtien': COL_DH_TONG_TIEN_SAU_VAT, 'giaohang': COL_DH_GIAO_HANG, 'thoigiantao': COL_DH_THOI_GIAN_TAO };
+  const sortColIndex = sortKeyMap[sortColumn] !== undefined ? sortKeyMap[sortColumn] : COL_DH_THOI_GIAN_TAO;
+  
+  filteredData.sort((a, b) => {
+    let valA = a[sortColIndex], valB = b[sortColIndex];
+    if (sortColumn === 'tongtien') { 
+      valA = parseFloat(valA) || 0; 
+      valB = parseFloat(valB) || 0; 
+    }
+    if (valA instanceof Date && valB instanceof Date) {
+        return sortOrder === 'asc' ? valA.getTime() - valB.getTime() : valB.getTime() - valA.getTime();
+    }
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const totalItems = filteredData.length;
+  const startIndex = (page - 1) * pageSize;
+  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+  const orders = paginatedData.map(row => formatRowDataAsObject(row, allData.findIndex(originalRow => originalRow[COL_DH_MA_DON] === row[COL_DH_MA_DON]) + 2));
+  
+  return { orders, totalItems };
+}
+
+function getOrderById(rowNumber) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet || rowNumber < 2 || rowNumber > sheet.getLastRow()) throw new Error("Số hàng không hợp lệ.");
+  
+  const rowValues = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+  let orderData = formatRowDataAsObject(rowValues, rowNumber);
+  
+  if (orderData.maKH) {
+    const customerDetails = getCustomerDetails(orderData.maKH);
+    if (customerDetails) { 
+      orderData.sdt = customerDetails.sdt || ''; 
+      orderData.email = customerDetails.email || ''; 
+    }
+  }
+  return orderData;
+}
+
+function getConfirmersList() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+    if (!sheet || sheet.getLastRow() < 2) return [];
+    const allData = sheet.getRange(2, COL_DH_NGUOI_XAC_NHAN_TT + 1, sheet.getLastRow() - 1, 1).getValues();
+    const confirmers = allData
+      .map(row => row[0])
+      .filter(name => name && typeof name === 'string' && name.trim() !== '');
+    return [...new Set(confirmers)].sort();
+  } catch (e) {
+    logAction("Lỗi lấy danh sách người xác nhận", e.message, {}, {});
+    return [];
+  }
+}
+
+function formatRowDataAsObject(rowValues, rowNumber) {
+  const giaoHangDate = rowValues[COL_DH_GIAO_HANG];
+  let giaoHangValue = '';
+  if (giaoHangDate instanceof Date) {
+    const formattedDate = Utilities.formatDate(giaoHangDate, TIMEZONE, "yyyy-MM-dd'T'HH:mm");
+    giaoHangValue = formattedDate;
+  }
+
+  const quycachValue = rowValues[COL_DH_QUY_CACH] !== null ? String(rowValues[COL_DH_QUY_CACH]) : '';
+  const tgXacNhanTT = rowValues[COL_DH_TG_XAC_NHAN_TT];
+
+  return {
+    row: rowNumber,
+    thoigiantao: (rowValues[COL_DH_THOI_GIAN_TAO] instanceof Date) ? Utilities.formatDate(rowValues[COL_DH_THOI_GIAN_TAO], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : rowValues[COL_DH_THOI_GIAN_TAO],
+    tenKH: rowValues[COL_DH_TEN_KH], 
+    maKH: rowValues[COL_DH_MA_KH] || '', 
+    madon: rowValues[COL_DH_MA_DON],
+    quycach: plainTextToHtml(quycachValue || ''), 
+    ghiChuDonHang: plainTextToHtml(rowValues[COL_DH_GHI_CHU_DON_HANG] || ''),
+    tongTienTruocVAT: parseFloat(rowValues[COL_DH_TONG_TIEN_TRUOC_VAT] || 0),
+    vatRate: rowValues[COL_DH_VAT_RATE] || '',
+    tienVAT: parseFloat(rowValues[COL_DH_TIEN_VAT] || 0),
+    tongTienSauVAT: parseFloat(rowValues[COL_DH_TONG_TIEN_SAU_VAT] || 0),
+    thongTinXuatHoaDon: rowValues[COL_DH_THONG_TIN_XUAT_HOA_DON] || '',
+    trangThaiXuatHoaDon: rowValues[COL_DH_TRANG_THAI_XUAT_HOA_DON] || '',
+    thanhtoan: (rowValues[COL_DH_THANH_TOAN] || '').toString().trim(), 
+    tienCoc: parseFloat(rowValues[COL_DH_TIEN_COC] || 0),
+    tienConLai: parseFloat(rowValues[COL_DH_TIEN_CON_LAI] || 0),
+    nhanvien: rowValues[COL_DH_NHAN_VIEN],
+    nguonKH: rowValues[COL_DH_NGUON_KH] || '', 
+    giaohang: giaoHangValue,
+    uutien: (rowValues[COL_DH_UU_TIEN] || '').toString().trim(), 
+    diachi: rowValues[COL_DH_DIA_CHI] || '',
+    tinhtrang: rowValues[COL_DH_TINH_TRANG], 
+    thietke: rowValues[COL_DH_THIET_KE] || '',
+    thietKeStatus: rowValues[COL_DH_THIET_KE_STATUS] || '', 
+    thietKeNote: String(rowValues[COL_DH_THIET_KE_NOTE] || ''),
+    phiThietKe: parseFloat(rowValues[COL_DH_PHI_THIET_KE] || 0),
+    inKhoLon: rowValues[COL_DH_IN_KHO_LON] || '',
+    phiInKhoLon: parseFloat(rowValues[COL_DH_PHI_IN_KHO_LON] || 0),
+    inKhoLonStatus: rowValues[COL_DH_IN_KHO_LON_STATUS] || '',
+    inKhoLonNote: String(rowValues[COL_DH_IN_KHO_LON_NOTE] || ''),
+    beDemi: rowValues[COL_DH_BE_DEMI] || '',
+    beDemiStatus: rowValues[COL_DH_BE_DEMI_STATUS] || '',
+    beDemiNote: String(rowValues[COL_DH_BE_DEMI_NOTE] || ''),
+    giaCongNgoai: rowValues[COL_DH_GIA_CONG_NGOAI] || '',
+    giaCongNgoaiStatus: rowValues[COL_DH_GIA_CONG_NGOAI_STATUS] || '',
+    giaCongNgoaiNote: String(rowValues[COL_DH_GIA_CONG_NGOAI_NOTE] || ''),
+    epKim: rowValues[COL_DH_EP_KIM] || '',
+    epKimStatus: rowValues[COL_DH_EP_KIM_STATUS] || '',
+    epKimNote: String(rowValues[COL_DH_EP_KIM_NOTE] || ''),
+    ghiChuTrangThai: plainTextToHtml(rowValues[COL_DH_GHI_CHU_TRANG_THAI] || ''),
+    hinhThucTT: rowValues[COL_DH_HINH_THUC_TT] || '',
+    xacNhanTT: rowValues[COL_DH_XAC_NHAN_TT] || '',
+    nguoiXacNhanTT: rowValues[COL_DH_NGUOI_XAC_NHAN_TT] || '',
+    tgXacNhanTT: (tgXacNhanTT instanceof Date) ? Utilities.formatDate(tgXacNhanTT, TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : '',
+    maTheoDoi: rowValues[COL_DH_MA_THEO_DOI] || '',
+    hinhThucTTCoc: rowValues[COL_DH_HINH_THUC_TT_COC] || '',
+    hinhThucTTConLai: rowValues[COL_DH_HINH_THUC_TT_CONLAI] || '',
+    ghiChuThanhToan: rowValues[COL_DH_GHI_CHU_TT] || '',
+    binhFileParticipants: rowValues[COL_DH_BINH_FILE_PARTICIPANTS] || '',
+    inParticipants: rowValues[COL_DH_IN_PARTICIPANTS] || '',
+    thanhPhamParticipants: rowValues[COL_DH_THANH_PHAM_PARTICIPANTS] || '',
+    binhFileParticipantsData: rowValues[COL_DH_BINH_FILE_PARTICIPANTS_DATA] || '[]',
+    inParticipantsData: rowValues[COL_DH_IN_PARTICIPANTS_DATA] || '[]',
+    thanhPhamParticipantsData: rowValues[COL_DH_THANH_PHAM_PARTICIPANTS_DATA] || '[]',
+    thietKeNguoiHT: rowValues[COL_DH_THIET_KE_NGUOI_HT] || '',
+    thietKeTgHT: (rowValues[COL_DH_THIET_KE_TG_HT] instanceof Date) ? Utilities.formatDate(rowValues[COL_DH_THIET_KE_TG_HT], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : '',
+    inKhoLonNguoiHT: rowValues[COL_DH_IN_KHO_LON_NGUOI_HT] || '',
+    inKhoLonTgHT: (rowValues[COL_DH_IN_KHO_LON_TG_HT] instanceof Date) ? Utilities.formatDate(rowValues[COL_DH_IN_KHO_LON_TG_HT], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : '',
+    beDemiNguoiHT: rowValues[COL_DH_BE_DEMI_NGUOI_HT] || '',
+    beDemiTgHT: (rowValues[COL_DH_BE_DEMI_TG_HT] instanceof Date) ? Utilities.formatDate(rowValues[COL_DH_BE_DEMI_TG_HT], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : '',
+    giaCongNgoaiNguoiHT: rowValues[COL_DH_GIA_CONG_NGOAI_NGUOI_HT] || '',
+    giaCongNgoaiTgHT: (rowValues[COL_DH_GIA_CONG_NGOAI_TG_HT] instanceof Date) ? Utilities.formatDate(rowValues[COL_DH_GIA_CONG_NGOAI_TG_HT], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : '',
+    epKimNguoiHT: rowValues[COL_DH_EP_KIM_NGUOI_HT] || '',
+    epKimTgHT: (rowValues[COL_DH_EP_KIM_TG_HT] instanceof Date) ? Utilities.formatDate(rowValues[COL_DH_EP_KIM_TG_HT], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy') : ''
+  };
+}
+// =================================================================================
+// CÁC HÀM CẬP NHẬT DỮ LIỆU
+// =================================================================================
+
+/**
+ * [BẢO MẬT] Hàm tham gia công đoạn, kiểm tra quyền trước khi thực hiện.
+ */
+function joinStage(rowNumber, stageType) {
+  const userRoleInfo = getCurrentUserRole();
+  const stageNameMap = { 'binhfile': 'Bình File', 'in': 'In', 'thanhpham': 'Thành Phẩm' };
+  const stageName = stageNameMap[stageType];
+
+  if (userRoleInfo.role !== 'Admin' && !userRoleInfo.permissions.allowedStages.includes(stageName)) {
+      throw new Error("Bạn không có quyền tham gia công đoạn '" + stageName + "'.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+
+  let dataColIndex, nameColIndex;
+  switch(stageType) {
+    case 'binhfile':
+      dataColIndex = COL_DH_BINH_FILE_PARTICIPANTS_DATA + 1;
+      nameColIndex = COL_DH_BINH_FILE_PARTICIPANTS + 1;
+      break;
+    case 'in':
+      dataColIndex = COL_DH_IN_PARTICIPANTS_DATA + 1;
+      nameColIndex = COL_DH_IN_PARTICIPANTS + 1;
+      break;
+    case 'thanhpham':
+      dataColIndex = COL_DH_THANH_PHAM_PARTICIPANTS_DATA + 1;
+      nameColIndex = COL_DH_THANH_PHAM_PARTICIPANTS + 1;
+      break;
+    default:
+      throw new Error("Loại công đoạn không hợp lệ.");
+  }
+
+  if (rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+
+  const dataRange = sheet.getRange(rowNumber, dataColIndex);
+  const currentDataJSON = dataRange.getValue().toString().trim() || '[]';
+  
+  let participantsData = [];
+  try {
+    participantsData = JSON.parse(currentDataJSON);
+  } catch (e) {
+    participantsData = [];
+  }
+  
+  const userName = userRoleInfo.name;
+  const isAlreadyJoined = participantsData.some(p => p.name === userName);
+
+  if (!isAlreadyJoined) {
+    participantsData.push({
+      name: userName,
+      time: getNowInVnTimezone().toISOString()
+    });
+    
+    const newParticipantsJSON = JSON.stringify(participantsData);
+    dataRange.setValue(newParticipantsJSON);
+    
+    const newParticipantsNames = participantsData.map(p => p.name).join(', ');
+    sheet.getRange(rowNumber, nameColIndex).setValue(newParticipantsNames);
+    
+    const maDon = sheet.getRange(rowNumber, COL_DH_MA_DON + 1).getValue();
+    logAction(`Tham gia công đoạn ${stageName}`, maDon, { old: currentDataJSON }, { new: newParticipantsJSON, user: userName });
+    
+    return { success: true, participantsData: newParticipantsJSON };
+  }
+  
+  return { success: true, participantsData: currentDataJSON };
+}
+
+function undoJoinStage(rowNumber, stageType) {
+  const userRoleInfo = getCurrentUserRole();
+  const stageNameMap = { 'binhfile': 'Bình File', 'in': 'In', 'thanhpham': 'Thành Phẩm' };
+  const stageName = stageNameMap[stageType];
+
+  // Chỉ cần check quyền cơ bản vì nếu đã tham gia được thì có quyền
+  if (!checkTaskEditPermission(userRoleInfo.role)) {
+    throw new Error("Bạn không có quyền thực hiện thao tác này.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+
+  let dataColIndex, nameColIndex;
+  switch(stageType) {
+    case 'binhfile':
+      dataColIndex = COL_DH_BINH_FILE_PARTICIPANTS_DATA + 1;
+      nameColIndex = COL_DH_BINH_FILE_PARTICIPANTS + 1;
+      break;
+    case 'in':
+      dataColIndex = COL_DH_IN_PARTICIPANTS_DATA + 1;
+      nameColIndex = COL_DH_IN_PARTICIPANTS + 1;
+      break;
+    case 'thanhpham':
+      dataColIndex = COL_DH_THANH_PHAM_PARTICIPANTS_DATA + 1;
+      nameColIndex = COL_DH_THANH_PHAM_PARTICIPANTS + 1;
+      break;
+    default:
+      throw new Error("Loại công đoạn không hợp lệ.");
+  }
+
+  if (rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+
+  const dataRange = sheet.getRange(rowNumber, dataColIndex);
+  const currentDataJSON = dataRange.getValue().toString().trim() || '[]';
+  
+  let participantsData = [];
+  try {
+    participantsData = JSON.parse(currentDataJSON);
+  } catch (e) {
+    return { success: false, message: 'Lỗi xử lý dữ liệu người tham gia.' };
+  }
+  
+  const userName = userRoleInfo.name;
+  const initialLength = participantsData.length;
+  const updatedParticipantsData = participantsData.filter(p => p.name !== userName);
+
+  if (updatedParticipantsData.length < initialLength) {
+    const newParticipantsJSON = JSON.stringify(updatedParticipantsData);
+    dataRange.setValue(newParticipantsJSON);
+    
+    const newParticipantsNames = updatedParticipantsData.map(p => p.name).join(', ');
+    sheet.getRange(rowNumber, nameColIndex).setValue(newParticipantsNames);
+    
+    const maDon = sheet.getRange(rowNumber, COL_DH_MA_DON + 1).getValue();
+    logAction(`Hoàn tác tham gia công đoạn ${stageName}`, maDon, { old: currentDataJSON }, { new: newParticipantsJSON, user: userName });
+    
+    return { success: true, participantsData: newParticipantsJSON };
+  }
+  
+  return { success: true, participantsData: currentDataJSON };
+}
+
+
+function addOrder(formData) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) throw new Error("Bạn không có quyền thêm đơn hàng.");
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+  if (!formData.tenKH || !formData.tongTienSauVAT) throw new Error("Tên khách hàng và Tổng tiền là bắt buộc.");
+  const code = generateOrderCode();
+  const trackingId = generateTrackingId();
+  
+  let finalNguonKH = '';
+  if (formData.maKH) {
+    const allOrdersData = sheet.getDataRange().getValues();
+    const hasPreviousOrder = allOrdersData.slice(1).some(row => row[COL_DH_MA_KH] === formData.maKH);
+    if (hasPreviousOrder) {
+      finalNguonKH = 'Khách Cũ';
+    } else {
+      const customerDetails = getCustomerDetails(formData.maKH);
+      finalNguonKH = customerDetails ? customerDetails.nguonKH : '';
+    }
+  }
+
+  const rowData = new Array(sheet.getLastColumn()).fill('');
+  rowData[COL_DH_THOI_GIAN_TAO] = getNowInVnTimezone();
+  rowData[COL_DH_TEN_KH] = formData.tenKH;
+  rowData[COL_DH_MA_KH] = formData.maKH || '';
+  rowData[COL_DH_MA_DON] = code;
+  rowData[COL_DH_QUY_CACH] = formData.quycach || '';
+  rowData[COL_DH_GHI_CHU_DON_HANG] = formData.ghiChuDonHang || '';
+  rowData[COL_DH_TONG_TIEN_TRUOC_VAT] = parseFloat(formData.tongTienTruocVAT);
+  rowData[COL_DH_VAT_RATE] = formData.vatRate > 0 ? `${formData.vatRate}%` : '';
+  rowData[COL_DH_TIEN_VAT] = parseFloat(formData.tienVAT);
+  rowData[COL_DH_TONG_TIEN_SAU_VAT] = parseFloat(formData.tongTienSauVAT);
+  rowData[COL_DH_THONG_TIN_XUAT_HOA_DON] = formData.thongTinXuatHoaDon || '';
+  rowData[COL_DH_TRANG_THAI_XUAT_HOA_DON] = formData.vatRate > 0 ? 'Chưa xuất' : '';
+  
+  const paymentStatus = (formData.thanhToanInitial || 'Công nợ').trim();
+  rowData[COL_DH_THANH_TOAN] = paymentStatus;
+  
+  let tienCoc = 0;
+  let tienConLai = 0;
+  const tongTienSauVAT = parseFloat(formData.tongTienSauVAT);
+  if (paymentStatus === 'Đã cọc') {
+      tienCoc = parseFloat(formData.tienCoc || 0);
+      tienConLai = tongTienSauVAT - tienCoc;
+  } else if (paymentStatus === 'Đã thanh toán') {
+      tienCoc = tongTienSauVAT;
+      tienConLai = 0;
+  } else {
+      tienCoc = 0;
+      tienConLai = tongTienSauVAT;
+  }
+  rowData[COL_DH_TIEN_COC] = tienCoc;
+  rowData[COL_DH_TIEN_CON_LAI] = tienConLai;
+
+  rowData[COL_DH_NHAN_VIEN] = userRoleInfo.name;
+  rowData[COL_DH_NGUON_KH] = finalNguonKH;
+  rowData[COL_DH_GIAO_HANG] = formData.ngaygiaohang ? new Date(formData.ngaygiaohang) : "";
+  rowData[COL_DH_UU_TIEN] = formData.isUrgent ? 'Gấp' : '';
+  rowData[COL_DH_DIA_CHI] = formData.diachigiaohang || '';
+  rowData[COL_DH_TINH_TRANG] = 'Nhận File';
+  rowData[COL_DH_THIET_KE] = formData.coThietKe ? 'Có' : 'Không';
+  rowData[COL_DH_THIET_KE_STATUS] = '';
+  rowData[COL_DH_THIET_KE_NOTE] = '';
+  rowData[COL_DH_PHI_THIET_KE] = formData.coThietKe ? parseFloat(formData.phiThietKe || 0) : 0;
+  rowData[COL_DH_IN_KHO_LON] = formData.inKhoLon ? 'Có' : 'Không';
+  rowData[COL_DH_PHI_IN_KHO_LON] = formData.inKhoLon ? parseFloat(formData.phiInKhoLon || 0) : 0;
+  rowData[COL_DH_IN_KHO_LON_STATUS] = '';
+  rowData[COL_DH_IN_KHO_LON_NOTE] = '';
+  rowData[COL_DH_BE_DEMI] = formData.coBeDemi ? 'Có' : 'Không';
+  rowData[COL_DH_BE_DEMI_STATUS] = '';
+  rowData[COL_DH_BE_DEMI_NOTE] = '';
+  
+  const hasGiaCongNgoai = formData.coGiaCongNgoai || formData.coGiacongngoai;
+  rowData[COL_DH_GIA_CONG_NGOAI] = hasGiaCongNgoai ? 'Có' : 'Không';
+  rowData[COL_DH_GIA_CONG_NGOAI_STATUS] = '';
+  rowData[COL_DH_GIA_CONG_NGOAI_NOTE] = hasGiaCongNgoai ? (formData.ghiChuGiacongngoai || '') : '';
+  
+  rowData[COL_DH_EP_KIM] = formData.coEpKim ? 'Có' : 'Không';
+  rowData[COL_DH_EP_KIM_STATUS] = '';
+  rowData[COL_DH_EP_KIM_NOTE] = '';
+  rowData[COL_DH_GHI_CHU_TRANG_THAI] = '';
+  
+  rowData[COL_DH_HINH_THUC_TT] = formData.hinhThucTT || '';
+  if (paymentStatus === 'Đã cọc' || paymentStatus === 'Đã thanh toán') {
+    rowData[COL_DH_XAC_NHAN_TT] = 'Chưa xác nhận';
+  } else {
+    rowData[COL_DH_XAC_NHAN_TT] = '';
+  }
+  rowData[COL_DH_NGUOI_XAC_NHAN_TT] = '';
+  rowData[COL_DH_TG_XAC_NHAN_TT] = '';
+  rowData[COL_DH_MA_THEO_DOI] = trackingId;
+
+  sheet.appendRow(rowData);
+  logAction("Tạo đơn mới", code, {}, formData);
+  clearCache();
+  return { success: true, message: "Tạo đơn hàng thành công!" };
+}
+
+function updateOrder(rowNumber, formData) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) throw new Error("Bạn không có quyền sửa đơn hàng.");
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+  if (!formData.tenKH || !formData.tongTienSauVAT) throw new Error("Tên khách hàng và Tổng tiền là bắt buộc.");
+  
+  const oldRowData = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const updatedValues = oldRowData.slice();
+  
+  updatedValues[COL_DH_TEN_KH] = formData.tenKH;
+  updatedValues[COL_DH_MA_KH] = formData.maKH || '';
+  updatedValues[COL_DH_QUY_CACH] = formData.quycach || '';
+  updatedValues[COL_DH_GHI_CHU_DON_HANG] = formData.ghiChuDonHang || '';
+  updatedValues[COL_DH_TONG_TIEN_TRUOC_VAT] = parseFloat(formData.tongTienTruocVAT);
+  updatedValues[COL_DH_VAT_RATE] = formData.vatRate > 0 ? `${formData.vatRate}%` : '';
+  updatedValues[COL_DH_TIEN_VAT] = parseFloat(formData.tienVAT);
+  updatedValues[COL_DH_TONG_TIEN_SAU_VAT] = parseFloat(formData.tongTienSauVAT);
+  updatedValues[COL_DH_THONG_TIN_XUAT_HOA_DON] = formData.thongTinXuatHoaDon || '';
+  if(formData.vatRate > 0 && !updatedValues[COL_DH_TRANG_THAI_XUAT_HOA_DON]) {
+    updatedValues[COL_DH_TRANG_THAI_XUAT_HOA_DON] = 'Chưa xuất';
+  } else if (formData.vatRate == 0) {
+    updatedValues[COL_DH_TRANG_THAI_XUAT_HOA_DON] = '';
+  }
+  
+  const paymentStatus = (formData.thanhToanInitial || 'Công nợ').trim();
+  updatedValues[COL_DH_THANH_TOAN] = paymentStatus;
+
+  let tienCoc = 0;
+  let tienConLai = 0;
+  const tongTienSauVAT = parseFloat(formData.tongTienSauVAT);
+  if (paymentStatus === 'Đã cọc') {
+      tienCoc = parseFloat(formData.tienCoc || 0);
+      tienConLai = tongTienSauVAT - tienCoc;
+  } else if (paymentStatus === 'Đã thanh toán') {
+      tienCoc = tongTienSauVAT;
+      tienConLai = 0;
+  } else {
+      tienCoc = 0;
+      tienConLai = tongTienSauVAT;
+  }
+  updatedValues[COL_DH_TIEN_COC] = tienCoc;
+  updatedValues[COL_DH_TIEN_CON_LAI] = tienConLai;
+
+  updatedValues[COL_DH_GIAO_HANG] = formData.ngaygiaohang ? new Date(formData.ngaygiaohang) : "";
+  updatedValues[COL_DH_UU_TIEN] = formData.isUrgent ? 'Gấp' : '';
+  updatedValues[COL_DH_DIA_CHI] = formData.diachigiaohang || '';
+  updatedValues[COL_DH_THIET_KE] = formData.coThietKe ? 'Có' : 'Không';
+  updatedValues[COL_DH_PHI_THIET_KE] = formData.coThietKe ? parseFloat(formData.phiThietKe || 0) : 0;
+  updatedValues[COL_DH_IN_KHO_LON] = formData.inKhoLon ? 'Có' : 'Không';
+  updatedValues[COL_DH_PHI_IN_KHO_LON] = formData.inKhoLon ? parseFloat(formData.phiInKhoLon || 0) : 0;
+  updatedValues[COL_DH_BE_DEMI] = formData.coBeDemi ? 'Có' : 'Không';
+
+  const hasGiaCongNgoai = formData.coGiaCongNgoai || formData.coGiacongngoai;
+  updatedValues[COL_DH_GIA_CONG_NGOAI] = hasGiaCongNgoai ? 'Có' : 'Không';
+  updatedValues[COL_DH_GIA_CONG_NGOAI_NOTE] = hasGiaCongNgoai ? (formData.ghiChuGiacongngoai || '') : '';
+  
+  updatedValues[COL_DH_EP_KIM] = formData.coEpKim ? 'Có' : 'Không';
+  
+  updatedValues[COL_DH_HINH_THUC_TT] = formData.hinhThucTT || '';
+  if (paymentStatus !== oldRowData[COL_DH_THANH_TOAN]) {
+      if (paymentStatus === 'Đã cọc' || paymentStatus === 'Đã thanh toán') {
+        updatedValues[COL_DH_XAC_NHAN_TT] = 'Chưa xác nhận';
+      } else {
+        updatedValues[COL_DH_XAC_NHAN_TT] = '';
+      }
+      updatedValues[COL_DH_NGUOI_XAC_NHAN_TT] = '';
+      updatedValues[COL_DH_TG_XAC_NHAN_TT] = '';
+  }
+
+  sheet.getRange(rowNumber, 1, 1, updatedValues.length).setValues([updatedValues]);
+  logAction("Chỉnh sửa đơn hàng", oldRowData[COL_DH_MA_DON], oldRowData, updatedValues);
+  clearCache();
+  return { success: true, message: "Cập nhật thành công!" };
+}
+
+/**
+ * [BẢO MẬT] Cập nhật trạng thái chính của đơn hàng, kiểm tra quyền trước khi thực hiện.
+ */
+function updateStatus(rowNumber, newStatus) {
+  const userRoleInfo = getCurrentUserRole();
+  if (userRoleInfo.role !== 'Admin' && !userRoleInfo.permissions.allowedStatuses.includes(newStatus)) {
+      throw new Error("Bạn không có quyền cập nhật trạng thái '" + newStatus + "'.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+  
+  const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+  const rowValues = rowRange.getValues()[0];
+
+  const oldStatus = rowValues[COL_DH_TINH_TRANG];
+  rowValues[COL_DH_TINH_TRANG] = newStatus;
+
+  if (newStatus === 'Đã hoàn thành' || newStatus === 'Đã giao hàng') {
+    if (rowValues[COL_DH_THIET_KE] === 'Có') rowValues[COL_DH_THIET_KE_STATUS] = 'Đã hoàn thành';
+    if (rowValues[COL_DH_IN_KHO_LON] === 'Có') rowValues[COL_DH_IN_KHO_LON_STATUS] = 'Đã hoàn thành';
+    if (rowValues[COL_DH_BE_DEMI] === 'Có') rowValues[COL_DH_BE_DEMI_STATUS] = 'Đã hoàn thành';
+    if (rowValues[COL_DH_GIA_CONG_NGOAI] === 'Có') rowValues[COL_DH_GIA_CONG_NGOAI_STATUS] = 'Đã hoàn thành';
+    if (rowValues[COL_DH_EP_KIM] === 'Có') rowValues[COL_DH_EP_KIM_STATUS] = 'Đã hoàn thành';
+  }
+
+  rowRange.setValues([rowValues]);
+  
+  logAction("Cập nhật trạng thái", rowValues[COL_DH_MA_DON], { old: oldStatus }, { new: newStatus });
+  clearCache();
+  return { success: true };
+}
+
+function updatePaymentDetails(rowNumber, newPaymentStatus, depositAmount = 0, hinhThucTT = '') {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh", "Kế toán"])) {
+    throw new Error("Bạn không có quyền cập nhật thanh toán.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet || rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+
+  const rowRange = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+  const rowValues = rowRange.getValues()[0];
+
+  const oldStatus = rowValues[COL_DH_THANH_TOAN];
+  const oldDeposit = parseFloat(rowValues[COL_DH_TIEN_COC] || 0);
+
+  const totalAmount = parseFloat(rowValues[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+
+  let newDeposit = 0;
+  let newRemaining = 0;
+
+  if (newPaymentStatus === 'Đã cọc') {
+    newDeposit = parseFloat(depositAmount || 0);
+    newRemaining = totalAmount - newDeposit;
+  } else if (newPaymentStatus === 'Đã thanh toán') {
+    newDeposit = totalAmount;
+    newRemaining = 0;
+  } else {
+    newDeposit = 0;
+    newRemaining = totalAmount;
+  }
+  
+  rowValues[COL_DH_THANH_TOAN] = newPaymentStatus;
+  rowValues[COL_DH_TIEN_COC] = newDeposit;
+  rowValues[COL_DH_TIEN_CON_LAI] = newRemaining;
+  if (hinhThucTT) {
+      rowValues[COL_DH_HINH_THUC_TT] = hinhThucTT;
+  }
+
+  if (oldStatus !== newPaymentStatus) {
+    if (newPaymentStatus === 'Đã cọc' || newPaymentStatus === 'Đã thanh toán') {
+        rowValues[COL_DH_XAC_NHAN_TT] = 'Chưa xác nhận';
+    } else {
+        rowValues[COL_DH_XAC_NHAN_TT] = '';
+    }
+    rowValues[COL_DH_NGUOI_XAC_NHAN_TT] = '';
+    rowValues[COL_DH_TG_XAC_NHAN_TT] = '';
+  }
+  
+  rowRange.setValues([rowValues]);
+
+  logAction("Cập nhật TT thanh toán", rowValues[COL_DH_MA_DON], 
+    { oldStatus: oldStatus, oldDeposit: oldDeposit }, 
+    { newStatus: newPaymentStatus, newDeposit: newDeposit, hinhThuc: hinhThucTT }
+  );
+  clearCache();
+  return { success: true, message: "Cập nhật thanh toán thành công!" };
+}
+
+function confirmPayment(rowNumber, paymentData) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Kế toán"])) {
+    throw new Error("Bạn không có quyền xác nhận thanh toán.");
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet || rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+
+  const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+  const values = range.getValues()[0];
+  const paymentStatus = values[COL_DH_THANH_TOAN];
+
+  if (paymentStatus !== 'Đã cọc' && paymentStatus !== 'Đã thanh toán') {
+      throw new Error("Chỉ có thể xác nhận cho đơn hàng 'Đã cọc' hoặc 'Đã thanh toán'.");
+  }
+  
+  const oldConfirmationStatus = values[COL_DH_XAC_NHAN_TT];
+  
+  values[COL_DH_XAC_NHAN_TT] = 'Đã xác nhận';
+  values[COL_DH_NGUOI_XAC_NHAN_TT] = userRoleInfo.name;
+  values[COL_DH_TG_XAC_NHAN_TT] = getNowInVnTimezone();
+  
+  if(paymentData) {
+    if (COL_DH_HINH_THUC_TT_COC < values.length) values[COL_DH_HINH_THUC_TT_COC] = paymentData.hinhThucTTCoc || '';
+    if (COL_DH_HINH_THUC_TT_CONLAI < values.length) values[COL_DH_HINH_THUC_TT_CONLAI] = paymentData.hinhThucTTConLai || '';
+    if (COL_DH_GHI_CHU_TT < values.length) values[COL_DH_GHI_CHU_TT] = paymentData.ghiChuThanhToan || '';
+  }
+
+  range.setValues([values]);
+
+  const maDon = values[COL_DH_MA_DON];
+  logAction("Xác nhận thanh toán", maDon, { old: oldConfirmationStatus }, { new: 'Đã xác nhận', by: userRoleInfo.name, data: paymentData });
+  clearCache();
+  return { success: true, message: "Xác nhận thanh toán thành công!" };
+}
+
+function updateTextField(rowNumber, fieldType, content) {
+  const userRoleInfo = getCurrentUserRole();
+  let colIndex;
+  let fieldName;
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error(`Sheet 'Donhang' không tồn tại.`);
+
+  switch(fieldType) {
+    case 'quycach':
+      if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) {
+        throw new Error("Bạn không có quyền sửa Quy cách đơn hàng.");
+      }
+      colIndex = COL_DH_QUY_CACH + 1;
+      fieldName = 'Quy cách';
+      break;
+    case 'ghiChuDonHang':
+    case 'ghiChuTrangThai':
+      if (!checkTaskEditPermission(userRoleInfo.role) && !checkPermission(userRoleInfo.role, ["Nhân Viên Kinh Doanh"])) {
+         throw new Error("Bạn không có quyền sửa Ghi chú.");
+      }
+      colIndex = (fieldType === 'ghiChuDonHang') ? COL_DH_GHI_CHU_DON_HANG + 1 : COL_DH_GHI_CHU_TRANG_THAI + 1;
+      fieldName = (fieldType === 'ghiChuDonHang') ? 'Ghi chú Đơn hàng' : 'Ghi chú Trạng thái';
+      break;
+    default:
+      throw new Error("Loại trường không hợp lệ.");
+  }
+
+  if (rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+
+  const range = sheet.getRange(rowNumber, colIndex);
+  const oldContent = range.getValue();
+  range.setValue(content);
+
+  logAction(`Cập nhật ${fieldName}`, sheet.getRange(rowNumber, COL_DH_MA_DON + 1).getValue(), { old: oldContent }, { new: content });
+  return { success: true, message: "Cập nhật nội dung thành công!" };
+}
+
+/**
+ * [BẢO MẬT] Cập nhật trạng thái công đoạn phụ, kiểm tra quyền trước khi thực hiện.
+ */
+function updateTaskStatus(rowNumber, taskType, action) {
+  const userRoleInfo = getCurrentUserRole();
+  
+  const taskNameMap = { 
+      'design': "Thiết kế", 'largeFormat': "In Khổ Lớn", 'demi': "Bế Demi", 
+      'outsource': "Gia công ngoài", 'epKim': "Ép Kim" 
+  };
+  const taskName = taskNameMap[taskType];
+
+  if(userRoleInfo.role !== 'Admin' && !userRoleInfo.permissions.allowedStages.includes(taskName)){
+    throw new Error("Bạn không có quyền thực hiện công đoạn '" + taskName + "'.");
+  }
+  
+  let statusCol, userCol, timeCol;
+  const newStatus = action === 'complete' ? 'Đã hoàn thành' : '';
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+
+  switch(taskType) {
+    case 'design':      statusCol = COL_DH_THIET_KE_STATUS;       userCol = COL_DH_THIET_KE_NGUOI_HT;       timeCol = COL_DH_THIET_KE_TG_HT;       break;
+    case 'largeFormat': statusCol = COL_DH_IN_KHO_LON_STATUS;     userCol = COL_DH_IN_KHO_LON_NGUOI_HT;     timeCol = COL_DH_IN_KHO_LON_TG_HT;     break;
+    case 'demi':        statusCol = COL_DH_BE_DEMI_STATUS;        userCol = COL_DH_BE_DEMI_NGUOI_HT;        timeCol = COL_DH_BE_DEMI_TG_HT;        break;
+    case 'outsource':   statusCol = COL_DH_GIA_CONG_NGOAI_STATUS; userCol = COL_DH_GIA_CONG_NGOAI_NGUOI_HT; timeCol = COL_DH_GIA_CONG_NGOAI_TG_HT; break;
+    case 'epKim':       statusCol = COL_DH_EP_KIM_STATUS;         userCol = COL_DH_EP_KIM_NGUOI_HT;         timeCol = COL_DH_EP_KIM_TG_HT;         break;
+    default: throw new Error("Loại công việc không hợp lệ.");
+  }
+
+  if (rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+  
+  const range = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn());
+  const values = range.getValues()[0];
+  const oldStatus = values[statusCol];
+  
+  values[statusCol] = newStatus;
+  
+  if (action === 'complete') {
+    values[userCol] = userRoleInfo.name;
+    values[timeCol] = getNowInVnTimezone();
+  } else { 
+    values[userCol] = '';
+    values[timeCol] = '';
+  }
+  
+  range.setValues([values]);
+  
+  logAction(`Cập nhật Trạng thái ${taskName}`, sheet.getRange(rowNumber, COL_DH_MA_DON + 1).getValue(), { old: oldStatus }, { new: newStatus, by: userRoleInfo.name });
+  clearCache();
+  return { success: true, message: "Cập nhật thành công!" };
+}
+
+function updateTaskNote(rowNumber, taskType, note) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkTaskEditPermission(userRoleInfo.role)) {
+    throw new Error("Bạn không có quyền cập nhật ghi chú công đoạn.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+
+  let colIndex, taskName;
+  switch(taskType) {
+    case 'design':      colIndex = COL_DH_THIET_KE_NOTE;       taskName = "Thiết kế"; break;
+    case 'largeFormat': colIndex = COL_DH_IN_KHO_LON_NOTE;     taskName = "In Khổ Lớn"; break;
+    case 'demi':        colIndex = COL_DH_BE_DEMI_NOTE;        taskName = "Bế Demi"; break;
+    case 'outsource':   colIndex = COL_DH_GIA_CONG_NGOAI_NOTE; taskName = "Gia công ngoài"; break;
+    case 'epKim':       colIndex = COL_DH_EP_KIM_NOTE;         taskName = "Ép Kim"; break;
+    default: throw new Error("Loại công việc không hợp lệ.");
+  }
+
+  if (rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+  
+  const range = sheet.getRange(rowNumber, colIndex + 1);
+  const oldNote = range.getValue();
+  range.setValue(note);
+  
+  logAction(`Cập nhật Ghi chú ${taskName}`, sheet.getRange(rowNumber, COL_DH_MA_DON + 1).getValue(), { old: oldNote }, { new: note });
+  
+  return { success: true, message: "Cập nhật ghi chú thành công!" };
+}
+
+function updateInvoiceStatus(rowNumber, newStatus) {
+  const userRoleInfo = getCurrentUserRole();
+  const allowedRoles = ["Admin", "Nhân Viên Kinh Doanh", "Kế toán"];
+  if (!checkPermission(userRoleInfo.role, allowedRoles)) {
+    throw new Error("Bạn không có quyền cập nhật trạng thái hóa đơn.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet || rowNumber < 2) throw new Error("Số hàng không hợp lệ.");
+  
+  const range = sheet.getRange(rowNumber, COL_DH_TRANG_THAI_XUAT_HOA_DON + 1);
+  const oldStatus = range.getValue();
+  range.setValue(newStatus);
+  
+  logAction("Cập nhật Trạng thái Hóa đơn", sheet.getRange(rowNumber, COL_DH_MA_DON + 1).getValue(), { old: oldStatus }, { new: newStatus });
+  clearCache();
+  return { success: true, message: "Cập nhật thành công!" };
+}
+
+function getAllCustomers() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Khachhang');
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const results = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][COL_KH_MA_KH]) {
+      results.push({ 
+        row: i + 1,
+        maKH: data[i][COL_KH_MA_KH], 
+        tenKH: data[i][COL_KH_TEN_KH], 
+        sdt: data[i][COL_KH_SDT], 
+        diachi: data[i][COL_KH_DIA_CHI], 
+        email: data[i][COL_KH_EMAIL],
+        nguonKH: data[i][COL_KH_NGUON_KH],
+        ghiChuCRM: data[i][COL_KH_GHI_CHU_CRM] || ''
+      });
+    }
+  }
+  return results.sort((a, b) => a.tenKH.localeCompare(b.tenKH));
+}
+
+function addCustomer(customerData) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) throw new Error("Bạn không có quyền thêm khách hàng.");
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Khachhang');
+  if (!sheet) throw new Error("Sheet 'Khachhang' không tồn tại.");
+  if (!customerData.tenKH || !customerData.sdt) throw new Error("Tên khách hàng và SĐT là bắt buộc.");
+  const sdtToFind = customerData.sdt.trim();
+  const data = sheet.getDataRange().getValues();
+  if (data.slice(1).some(row => row[COL_KH_SDT] && row[COL_KH_SDT].toString().trim() === sdtToFind)) { throw new Error("Số điện thoại này đã tồn tại."); }
+  const maKH = generateCustomerCode();
+  
+  sheet.appendRow([maKH, customerData.tenKH, customerData.sdt, customerData.diachi || '', customerData.email || '', customerData.nguonKH || '', customerData.ghiChuCRM || '']);
+  const newRowIndex = sheet.getLastRow();
+  sheet.getRange(newRowIndex, COL_KH_SDT + 1).setNumberFormat('@');
+
+  logAction("Thêm khách hàng mới", maKH, {}, customerData);
+  clearCache();
+  return { maKH: maKH };
+}
+
+function updateCustomer(customerData) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) {
+    throw new Error("Bạn không có quyền cập nhật thông tin khách hàng.");
+  }
+  if (!customerData || !customerData.maKH || !customerData.tenKH || !customerData.sdt) {
+    throw new Error("Dữ liệu không hợp lệ. Vui lòng cung cấp đủ Mã KH, Tên, và SĐT.");
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Khachhang');
+  if (!sheet) throw new Error("Sheet 'Khachhang' không tồn tại.");
+
+  const data = sheet.getDataRange().getValues();
+  const rowIndex = data.findIndex(row => row[COL_KH_MA_KH] == customerData.maKH);
+
+  if (rowIndex === -1) {
+    throw new Error("Không tìm thấy khách hàng với mã: " + customerData.maKH);
+  }
+
+  const oldRowData = data[rowIndex];
+  const oldCustomerInfo = {
+    tenKH: oldRowData[COL_KH_TEN_KH],
+    sdt: oldRowData[COL_KH_SDT],
+    diachi: oldRowData[COL_KH_DIA_CHI],
+    email: oldRowData[COL_KH_EMAIL],
+    nguonKH: oldRowData[COL_KH_NGUON_KH],
+    ghiChuCRM: oldRowData[COL_KH_GHI_CHU_CRM]
+  };
+
+  logCustomerAction(customerData.maKH, oldCustomerInfo, customerData);
+
+  const rowToUpdate = rowIndex + 1;
+  sheet.getRange(rowToUpdate, COL_KH_TEN_KH + 1).setValue(customerData.tenKH);
+  sheet.getRange(rowToUpdate, COL_KH_SDT + 1).setValue(customerData.sdt).setNumberFormat('@');
+  sheet.getRange(rowToUpdate, COL_KH_DIA_CHI + 1).setValue(customerData.diachi || '');
+  sheet.getRange(rowToUpdate, COL_KH_EMAIL + 1).setValue(customerData.email || '');
+  sheet.getRange(rowToUpdate, COL_KH_NGUON_KH + 1).setValue(customerData.nguonKH || '');
+  sheet.getRange(rowToUpdate, COL_KH_GHI_CHU_CRM + 1).setValue(customerData.ghiChuCRM || '');
+
+
+  clearCache();
+  return { success: true, message: "Cập nhật thông tin khách hàng thành công!", updatedData: customerData };
+}
+
+
+// =================================================================================
+// CHỨC NĂNG BÁO CÁO VÀ DASHBOARD
+// =================================================================================
+
+// ... (getActivityReport, getCustomerAnalytics, getFinancialReport, getDailyActivityReport, getWorkPerformanceStats, getEmployeePerformanceStats, exportPerformanceReportAsPdf, getDashboardStats, getDebtOrders, getUnpaidOrders giữ nguyên) ...
+function getActivityReport(options) {
+  const { startDate, endDate } = options;
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Kế toán"])) {
+    throw new Error("Bạn không có quyền truy cập chức năng này.");
+  }
+  
+  if (!startDate || !endDate) {
+    throw new Error("Vui lòng cung cấp ngày bắt đầu và ngày kết thúc.");
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+  
+  const allData = sheet.getDataRange().getValues().slice(1);
+  
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  const report = {
+    inProgressOrders: [],
+    completedOrders: [],
+    inProgressCount: 0,
+    completedCount: 0,
+    inProgressValue: 0,
+    completedValue: 0
+  };
+
+  const completedStatuses = ['đã hoàn thành', 'đã giao hàng'];
+  const cancelledStatus = 'đã hủy';
+
+  allData.forEach((row, index) => {
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    if (!(createDate instanceof Date) || createDate < startDateObj || createDate > endDateObj) {
+      return;
+    }
+
+    const status = (row[COL_DH_TINH_TRANG] || '').toLowerCase().trim();
+    const value = parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+    const orderObject = formatRowDataAsObject(row, index + 2);
+
+    if (completedStatuses.includes(status)) {
+      report.completedOrders.push(orderObject);
+      report.completedCount++;
+      report.completedValue += value;
+    } else if (status !== cancelledStatus) {
+      report.inProgressOrders.push(orderObject);
+      report.inProgressCount++;
+      report.inProgressValue += value;
+    }
+  });
+
+  return report;
+}
+
+function getCustomerAnalytics(maKH) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh"])) {
+    throw new Error("Bạn không có quyền xem chức năng này.");
+  }
+  if (!maKH) throw new Error("Vui lòng cung cấp mã khách hàng.");
+  
+  const customerInfo = getCustomerDetails(maKH);
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+  const allOrdersData = sheet.getDataRange().getValues().slice(1);
+
+  const customerOrders = allOrdersData.filter(row => (row[COL_DH_MA_KH] || '').trim() === maKH && (row[COL_DH_TINH_TRANG] || '').toLowerCase() !== 'đã hủy');
+  
+  if (customerOrders.length === 0) {
+    return {
+      customerInfo: customerInfo,
+      totalRevenue: 0,
+      orderCount: 0,
+      firstOrderDate: null,
+      lastOrderDate: null,
+      daysSinceLastOrder: null,
+      avgDaysBetweenOrders: null,
+      monthlyStats: {},
+      history: getCustomerHistory(maKH)
+    };
+  }
+  
+  let totalRevenue = 0;
+  let orderDates = [];
+  let monthlyStats = {};
+
+  customerOrders.forEach(row => {
+    totalRevenue += parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    if (createDate instanceof Date) {
+      orderDates.push(createDate);
+      const monthYearKey = `${createDate.getMonth() + 1}/${createDate.getFullYear()}`;
+      monthlyStats[monthYearKey] = (monthlyStats[monthYearKey] || 0) + 1;
+    }
+  });
+
+  orderDates.sort((a, b) => a.getTime() - b.getTime());
+  
+  const firstOrderDate = orderDates[0];
+  const lastOrderDate = orderDates[orderDates.length - 1];
+  
+  const now = getNowInVnTimezone();
+  const daysSinceLastOrder = Math.floor((now.getTime() - lastOrderDate.getTime()) / (1000 * 3600 * 24));
+  
+  let avgDaysBetweenOrders = null;
+  if (orderDates.length > 1) {
+    const totalTimeSpan = lastOrderDate.getTime() - firstOrderDate.getTime();
+    avgDaysBetweenOrders = Math.round((totalTimeSpan / (1000 * 3600 * 24)) / (orderDates.length - 1));
+  }
+
+  return {
+    customerInfo: customerInfo,
+    totalRevenue,
+    orderCount: customerOrders.length,
+    firstOrderDate: Utilities.formatDate(firstOrderDate, TIMEZONE, 'dd/MM/yyyy'),
+    lastOrderDate: Utilities.formatDate(lastOrderDate, TIMEZONE, 'dd/MM/yyyy'),
+    daysSinceLastOrder,
+    avgDaysBetweenOrders,
+    monthlyStats,
+    history: getCustomerHistory(maKH)
+  };
+}
+
+
+function getFinancialReport(options) {
+  const { startDate, endDate } = options;
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Kế toán"])) {
+    throw new Error("Bạn không có quyền truy cập chức năng này.");
+  }
+  
+  if (!startDate || !endDate) {
+    throw new Error("Vui lòng cung cấp ngày bắt đầu và ngày kết thúc.");
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+  
+  const allData = sheet.getDataRange().getValues().slice(1);
+  
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  const report = {
+    tongThuTienMat: 0,
+    tongThuChuyenKhoan: 0,
+    tongDoanhThuDaThu: 0,
+    congNoMoiPhatSinh: 0
+  };
+
+  allData.forEach(row => {
+    const tgTaoDon = row[COL_DH_THOI_GIAN_TAO];
+    const tgXacNhan = row[COL_DH_TG_XAC_NHAN_TT];
+    const trangThaiTT = (row[COL_DH_THANH_TOAN] || '').trim();
+    const trangThaiXacNhan = (row[COL_DH_XAC_NHAN_TT] || '').trim();
+    
+    // Tính công nợ mới phát sinh trong kỳ
+    if (trangThaiTT === 'Công nợ' && tgTaoDon instanceof Date && tgTaoDon >= startDateObj && tgTaoDon <= endDateObj) {
+      report.congNoMoiPhatSinh += parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+    }
+    
+    // Tính tổng thu trong kỳ (chỉ tính các khoản đã được xác nhận)
+    if (trangThaiXacNhan === 'Đã xác nhận' && tgXacNhan instanceof Date && tgXacNhan >= startDateObj && tgXacNhan <= endDateObj) {
+        
+        let collectedAmountThisConfirmation = 0;
+        let paymentMethodThisConfirmation = '';
+
+        const oldHistory = getOrderHistory(row[COL_DH_MA_DON]);
+        const thisConfirmationEntry = oldHistory.find(h => {
+          if (!h.timestamp) return false;
+          // Cần parse ngày tháng từ string 'HH:mm:ss, dd/MM/yyyy' sang Date object để so sánh
+          const parts = h.timestamp.split(', ');
+          const timeParts = parts[0].split(':');
+          const dateParts = parts[1].split('/');
+          // Lưu ý: Tháng trong JS Date là 0-indexed (0=Jan, 11=Dec)
+          const historyDate = new Date(+dateParts[2], +dateParts[1] - 1, +dateParts[0], +timeParts[0], +timeParts[1], +timeParts[2]);
+          return h.action === 'Xác nhận thanh toán' && historyDate.getTime() === tgXacNhan.getTime();
+        });
+
+        // Ưu tiên lấy thông tin thanh toán chi tiết nếu có
+        const hinhThucCoc = row[COL_DH_HINH_THUC_TT_COC] || '';
+        const hinhThucConLai = row[COL_DH_HINH_THUC_TT_CONLAI] || '';
+        const hinhThucChung = row[COL_DH_HINH_THUC_TT] || ''; // Hình thức chung nếu không có chi tiết
+
+        if (trangThaiTT === 'Đã cọc') {
+            collectedAmountThisConfirmation = parseFloat(row[COL_DH_TIEN_COC] || 0);
+            paymentMethodThisConfirmation = hinhThucCoc || hinhThucChung; // Ưu tiên hình thức cọc
+        } else if (trangThaiTT === 'Đã thanh toán') {
+            // Tính số tiền thu được trong lần xác nhận này
+            // Nếu trước đó là 'Đã cọc', số tiền thu thêm là tiền còn lại
+            // Nếu trước đó là 'Chưa thanh toán'/'Công nợ', số tiền thu là toàn bộ
+            let previousDeposit = 0;
+            if (thisConfirmationEntry && thisConfirmationEntry.oldData) {
+                 try {
+                     const oldPaymentStatus = JSON.parse(thisConfirmationEntry.oldData).oldStatus;
+                     if(oldPaymentStatus === 'Đã cọc') {
+                        // Tìm giá trị tiền cọc trước khi xác nhận lần cuối này
+                        const historyBeforeConfirmation = oldHistory.filter(entry => {
+                           const entryParts = entry.timestamp.split(', ');
+                           const entryTimeParts = entryParts[0].split(':');
+                           const entryDateParts = entryParts[1].split('/');
+                           const entryDate = new Date(+entryDateParts[2], +entryDateParts[1] - 1, +entryDateParts[0], +entryTimeParts[0], +entryTimeParts[1], +entryTimeParts[2]);
+                           return entryDate.getTime() < tgXacNhan.getTime();
+                        }).sort((a,b) => { // Sắp xếp để tìm entry gần nhất
+                             // Cần parse ngày tháng từ string 'HH:mm:ss, dd/MM/yyyy' sang Date object để so sánh
+                             const partsA = a.timestamp.split(', ');
+                             const timePartsA = partsA[0].split(':');
+                             const datePartsA = partsA[1].split('/');
+                             const dateA = new Date(+datePartsA[2], +datePartsA[1] - 1, +datePartsA[0], +timePartsA[0], +timePartsA[1], +timePartsA[2]);
+
+                             const partsB = b.timestamp.split(', ');
+                             const timePartsB = partsB[0].split(':');
+                             const datePartsB = partsB[1].split('/');
+                             const dateB = new Date(+datePartsB[2], +datePartsB[1] - 1, +datePartsB[0], +timePartsB[0], +timePartsB[1], +timePartsB[2]);
+
+                             return dateB - dateA; // Mới nhất trước
+                        });
+                        // Tìm lần cập nhật thanh toán gần nhất trước khi xác nhận cuối
+                        const lastPaymentUpdate = historyBeforeConfirmation.find(e => e.action === 'Cập nhật TT thanh toán');
+                        if(lastPaymentUpdate && lastPaymentUpdate.newData){
+                            previousDeposit = JSON.parse(lastPaymentUpdate.newData).newDeposit || 0;
+                        } else {
+                            // Nếu không có lịch sử cập nhật TT, thử lấy tiền cọc từ đơn hàng (ít chính xác hơn)
+                            previousDeposit = parseFloat(row[COL_DH_TIEN_COC] || 0); // Giả định tiền cọc không đổi
+                        }
+
+                     }
+                 } catch (e) {
+                     // Nếu lỗi parse JSON, dùng giá trị mặc định
+                     previousDeposit = 0;
+                 }
+            } else {
+                 // Fallback nếu không có history entry khớp (trường hợp hiếm)
+                 // Nếu xác nhận lần đầu là thanh toán đủ luôn
+                 previousDeposit = 0;
+            }
+            collectedAmountThisConfirmation = parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0) - previousDeposit;
+            paymentMethodThisConfirmation = hinhThucConLai || hinhThucChung; // Ưu tiên hình thức còn lại
+        }
+
+
+        if (collectedAmountThisConfirmation > 0) {
+            const method = (paymentMethodThisConfirmation || '').toLowerCase();
+            if (method.includes('tiền mặt') || method.includes('tm')) {
+                report.tongThuTienMat += collectedAmountThisConfirmation;
+            } else { // Mặc định là chuyển khoản nếu không phải tiền mặt
+                report.tongThuChuyenKhoan += collectedAmountThisConfirmation;
+            }
+            report.tongDoanhThuDaThu += collectedAmountThisConfirmation;
+        }
+    }
+  });
+
+  return report;
+}
+
+
+function getDailyActivityReport(dateString) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Kế toán"])) {
+    throw new Error("Bạn không có quyền truy cập chức năng này.");
+  }
+  
+  if (!dateString) {
+    throw new Error("Vui lòng chọn ngày để xem báo cáo.");
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Lichsu');
+  if (!sheet) throw new Error("Sheet 'Lichsu' không tồn tại.");
+
+  const usersInfo = getUsersInfo();
+  const allHistory = sheet.getDataRange().getValues().slice(1);
+  
+  const reportDate = new Date(dateString);
+  const startTime = new Date(reportDate).setHours(0, 0, 0, 0);
+  const endTime = new Date(reportDate).setHours(23, 59, 59, 999);
+
+  const activities = allHistory.filter(row => {
+    const timestamp = row[COL_LS_TIMESTAMP];
+    return timestamp instanceof Date && timestamp.getTime() >= startTime && timestamp.getTime() <= endTime;
+  }).map(row => {
+    const userEmail = (row[COL_LS_USER] || '').trim().toLowerCase();
+    const userInfo = usersInfo[userEmail] || { name: userEmail, role: 'Không xác định' };
+    return {
+      timestamp: Utilities.formatDate(row[COL_LS_TIMESTAMP], TIMEZONE, 'HH:mm:ss, dd/MM/yyyy'),
+      userName: userInfo.name,
+      action: row[COL_LS_ACTION],
+      detail: row[COL_LS_DETAIL],
+      oldData: row[COL_LS_OLD_DATA],
+      newData: row[COL_LS_NEW_DATA]
+    };
+  }).sort((a, b) => { // Sort descending by time
+        // Cần parse ngày tháng từ string 'HH:mm:ss, dd/MM/yyyy' sang Date object để so sánh
+        const partsA = a.timestamp.split(', ');
+        const timePartsA = partsA[0].split(':');
+        const datePartsA = partsA[1].split('/');
+        const dateA = new Date(+datePartsA[2], +datePartsA[1] - 1, +datePartsA[0], +timePartsA[0], +timePartsA[1], +timePartsA[2]);
+
+        const partsB = b.timestamp.split(', ');
+        const timePartsB = partsB[0].split(':');
+        const datePartsB = partsB[1].split('/');
+        const dateB = new Date(+datePartsB[2], +datePartsB[1] - 1, +datePartsB[0], +timePartsB[0], +timePartsB[1], +timePartsB[2]);
+        return dateB - dateA;
+  });
+
+  return activities;
+}
+
+
+function getWorkPerformanceStats(options) {
+  const { startDate, endDate } = options;
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin"])) {
+    throw new Error("Bạn không có quyền truy cập chức năng này.");
+  }
+  
+  const historySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Lichsu');
+  const orderSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!historySheet || !orderSheet) {
+    throw new Error("Không tìm thấy sheet 'Lichsu' hoặc 'Donhang'.");
+  }
+
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  const usersInfo = getUsersInfo();
+  
+  const historyData = historySheet.getDataRange().getValues().slice(1);
+  const orderParticipation = {}; 
+
+  historyData.forEach(row => {
+    const timestamp = row[COL_LS_TIMESTAMP];
+    const maDon = row[COL_LS_DETAIL];
+    
+    if (!maDon || !(timestamp instanceof Date) || timestamp < startDateObj || timestamp > endDateObj) {
+      return;
+    }
+    
+    const userEmail = (row[COL_LS_USER] || '').trim().toLowerCase();
+    const userInfo = usersInfo[userEmail];
+    if (!userInfo || !userInfo.name) return;
+    
+    const userName = userInfo.name;
+
+    if (!orderParticipation[maDon]) {
+      orderParticipation[maDon] = { users: new Set() };
+    }
+    orderParticipation[maDon].users.add(userName);
+  });
+
+  const participatingOrderIds = Object.keys(orderParticipation);
+  if (participatingOrderIds.length === 0) {
+    return {};
+  }
+  
+  const allOrdersData = orderSheet.getDataRange().getValues().slice(1);
+  const orderRevenues = {};
+
+  allOrdersData.forEach(row => {
+    const maDon = row[COL_DH_MA_DON];
+    if (participatingOrderIds.includes(maDon)) {
+      const revenue = parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+      const status = (row[COL_DH_TINH_TRANG] || '').trim();
+      if (status !== 'Đã hủy') {
+        orderRevenues[maDon] = revenue;
+      }
+    }
+  });
+
+  const stats = {};
+
+  Object.values(usersInfo).forEach(user => {
+    if (user.name) {
+       stats[user.name] = {
+        name: user.name,
+        role: user.role,
+        soDonThamGia: 0,
+        tongDoanhThuThamGia: 0
+      };
+    }
+  });
+
+  for (const maDon in orderParticipation) {
+    const revenue = orderRevenues[maDon];
+    if (revenue === undefined) continue; // Skip if order was cancelled or revenue is invalid
+
+    const participants = orderParticipation[maDon].users;
+    participants.forEach(userName => {
+      if (stats[userName]) {
+        stats[userName].tongDoanhThuThamGia += revenue;
+        stats[userName].soDonThamGia += 1;
+      }
+    });
+  }
+  
+  const finalStats = {};
+  for(const userName in stats){
+    if(stats[userName].soDonThamGia > 0){
+      finalStats[userName] = stats[userName];
+    }
+  }
+
+  return finalStats;
+}
+
+
+function getEmployeePerformanceStats(options) {
+  const { employeeName, startDate, endDate } = options;
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin"])) {
+    throw new Error("Bạn không có quyền truy cập chức năng này.");
+  }
+
+  if (!employeeName || !startDate || !endDate) {
+    throw new Error("Vui lòng cung cấp đầy đủ thông tin: Tên nhân viên, ngày bắt đầu và ngày kết thúc.");
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) {
+    throw new Error("Sheet 'Donhang' không tồn tại.");
+  }
+  const allData = sheet.getDataRange().getValues().slice(1);
+
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  const stats = {
+    totalRevenue: 0,
+    totalOrders: 0,
+    completedOrders: 0,
+    canceledOrders: 0,
+    onTimeOrders: 0,
+    lateOrders: 0,
+    totalCustomers: 0,
+    newCustomersCount: 0,
+    returningCustomersCount: 0,
+    urgentOrders: 0,
+    pendingOrders: 0
+  };
+
+  const customerFirstOrderDate = {};
+  allData.forEach(row => {
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    const maKH = (row[COL_DH_MA_KH] || '').trim();
+    const tenKH = (row[COL_DH_TEN_KH] || '').trim();
+    const customerKey = maKH || `VL_${tenKH}`;
+
+    if (customerKey && createDate instanceof Date) {
+      if (!customerFirstOrderDate[customerKey] || createDate < customerFirstOrderDate[customerKey]) {
+        customerFirstOrderDate[customerKey] = createDate;
+      }
+    }
+  });
+
+  const employeeOrders = allData.filter(row => {
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    const orderEmployee = (row[COL_DH_NHAN_VIEN] || '').trim();
+    
+    return orderEmployee === employeeName &&
+           createDate instanceof Date &&
+           createDate >= startDateObj &&
+           createDate <= endDateObj;
+  });
+
+  const customerSet = new Set();
+  employeeOrders.forEach(row => {
+    const status = (row[COL_DH_TINH_TRANG] || '').trim();
+    const maKH = (row[COL_DH_MA_KH] || '').trim();
+    const tenKH = (row[COL_DH_TEN_KH] || '').trim();
+    const customerKey = maKH || `VL_${tenKH}`;
+    const deliveryDueDate = row[COL_DH_GIAO_HANG];
+    const isCompleted = status === 'Đã hoàn thành' || status === 'Đã giao hàng';
+
+    stats.totalOrders++;
+    
+    if (status === 'Đã hủy') {
+      stats.canceledOrders++;
+      return; 
+    }
+
+    stats.totalRevenue += parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+
+    if (isCompleted) {
+      stats.completedOrders++;
+      // Simple check: assume completed are on time for now, can be refined later if completion date is stored
+      stats.onTimeOrders++;
+    } else { 
+      stats.pendingOrders++;
+      if (deliveryDueDate instanceof Date && getNowInVnTimezone() > deliveryDueDate) {
+        stats.lateOrders++;
+      }
+    }
+
+    if ((row[COL_DH_UU_TIEN] || '').toString().trim() === 'Gấp') {
+      stats.urgentOrders++;
+    }
+
+    if (customerKey) {
+      if (!customerSet.has(customerKey)) {
+        customerSet.add(customerKey);
+        stats.totalCustomers++;
+        if (customerFirstOrderDate[customerKey] && customerFirstOrderDate[customerKey] >= startDateObj && customerFirstOrderDate[customerKey] <= endDateObj) {
+          stats.newCustomersCount++;
+        } else {
+          stats.returningCustomersCount++;
+        }
+      }
+    }
+  });
+
+  return stats;
+}
+
+function exportPerformanceReportAsPdf(stats, employeeName, startDate, endDate) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin"])) {
+    throw new Error("Bạn không có quyền xuất báo cáo.");
+  }
+
+  const title = `Báo cáo Hiệu quả Kinh doanh - ${employeeName}`;
+  const dateRange = `Từ ngày: ${Utilities.formatDate(new Date(startDate), TIMEZONE, 'dd/MM/yyyy')} - Đến ngày: ${Utilities.formatDate(new Date(endDate), TIMEZONE, 'dd/MM/yyyy')}`;
+  const fileName = `BaoCaoHieuQua_${employeeName}_${Utilities.formatDate(getNowInVnTimezone(), TIMEZONE, "yyyyMMdd")}.pdf`;
+
+  const tempDoc = DocumentApp.create(fileName.replace('.pdf', ''));
+  const body = tempDoc.getBody();
+
+  const titleStyle = {};
+  titleStyle[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.HorizontalAlignment.CENTER;
+  titleStyle[DocumentApp.Attribute.FONT_SIZE] = 18;
+  titleStyle[DocumentApp.Attribute.BOLD] = true;
+
+  const subtitleStyle = {};
+  subtitleStyle[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.HorizontalAlignment.CENTER;
+  subtitleStyle[DocumentApp.Attribute.FONT_SIZE] = 11;
+  subtitleStyle[DocumentApp.Attribute.ITALIC] = true;
+
+  const headingStyle = {};
+  headingStyle[DocumentApp.Attribute.FONT_SIZE] = 14;
+  headingStyle[DocumentApp.Attribute.BOLD] = true;
+  headingStyle[DocumentApp.Attribute.SPACING_BEFORE] = 18;
+  headingStyle[DocumentApp.Attribute.SPACING_AFTER] = 6;
+
+  const tableHeaderStyle = {};
+  tableHeaderStyle[DocumentApp.Attribute.BOLD] = true;
+  tableHeaderStyle[DocumentApp.Attribute.BACKGROUND_COLOR] = '#D9D9D9';
+  
+  body.appendParagraph(title).setAttributes(titleStyle);
+  body.appendParagraph(dateRange).setAttributes(subtitleStyle);
+  body.appendParagraph(''); 
+
+  body.appendParagraph("I. CÁC CHỈ SỐ CHÍNH (KPIs)").setAttributes(headingStyle);
+  const kpis = [
+    ["Chỉ số", "Giá trị"],
+    ["Tổng Doanh thu", `${(stats.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ`],
+    ["Tổng số Đơn hàng", `${stats.totalOrders} (Hoàn thành: ${stats.completedOrders})`],
+    ["Tỷ lệ Hủy đơn", `${(stats.totalOrders > 0 ? (stats.canceledOrders / stats.totalOrders * 100) : 0).toFixed(1)}% (${stats.canceledOrders} đơn)`],
+    ["Tỷ lệ Đúng hạn", `${((stats.onTimeOrders + stats.lateOrders) > 0 ? (stats.onTimeOrders / (stats.onTimeOrders + stats.lateOrders) * 100) : 0).toFixed(1)}% (${stats.onTimeOrders}/${stats.onTimeOrders + stats.lateOrders} đơn)`]
+  ];
+  const kpiTable = body.appendTable(kpis);
+  kpiTable.getRow(0).setAttributes(tableHeaderStyle);
+  kpiTable.getCell(0,0).setWidth(200);
+
+  body.appendParagraph("II. PHÂN TÍCH KHÁCH HÀNG").setAttributes(headingStyle);
+  const customers = [
+    ["Phân loại", "Số lượng"],
+    ["Tổng số Khách hàng", stats.totalCustomers],
+    ["Khách hàng Mới", stats.newCustomersCount],
+    ["Khách hàng Quay lại", stats.returningCustomersCount]
+  ];
+  const customerTable = body.appendTable(customers);
+  customerTable.getRow(0).setAttributes(tableHeaderStyle);
+  customerTable.getCell(0,0).setWidth(200);
+
+  body.appendParagraph("III. CHI TIẾT ĐƠN HÀNG").setAttributes(headingStyle);
+  const details = [
+    ["Chi tiết", "Số lượng"],
+    ["Đơn hàng Gấp", stats.urgentOrders],
+    ["Đơn giao Đúng hạn", stats.onTimeOrders],
+    ["Đơn giao Trễ hạn", stats.lateOrders],
+    ["Đơn đang xử lý (chưa giao)", stats.pendingOrders]
+  ];
+  const detailTable = body.appendTable(details);
+  detailTable.getRow(0).setAttributes(tableHeaderStyle);
+  detailTable.getCell(0,0).setWidth(200);
+
+  tempDoc.saveAndClose();
+  const pdfBlob = tempDoc.getAs('application/pdf').setName(fileName);
+  const tempFile = DriveApp.createFile(pdfBlob);
+  const url = tempFile.getDownloadUrl();
+  
+  Utilities.sleep(10000); // Wait for Drive to process the file
+  DriveApp.getFileById(tempFile.getId()).setTrashed(true);
+
+  return url;
+}
+
+
+function getDashboardStats(options = {}) {
+  const { period = 'month', startDate, endDate } = options;
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  const defaultStats = { 
+    ordersInPeriod: 0, revenueInPeriodWithVAT: 0, revenueInPeriodWithoutVAT: 0,
+    designRevenueInPeriod: 0, largeFormatRevenueInPeriod: 0,
+    statusCounts: {}, salesByEmployee: {}, sourceCounts: {}, 
+    lifecycleCounts: { 'Khách mới': 0, 'Khách quay lại': 0 },
+    dailyRevenueInPeriod: []
+  };
+  if (!sheet) return defaultStats;
+
+  const allData = sheet.getDataRange().getValues().slice(1);
+  let stats = JSON.parse(JSON.stringify(defaultStats));
+  
+  const now = getNowInVnTimezone();
+  let periodStart, periodEnd;
+
+  switch(period) {
+    case 'today':
+      periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      periodEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      break;
+    case 'custom':
+      if (!startDate || !endDate) throw new Error("Ngày bắt đầu và kết thúc là bắt buộc cho khoảng tùy chọn.");
+      periodStart = new Date(startDate + 'T00:00:00');
+      periodEnd = new Date(endDate + 'T23:59:59');
+      break;
+    case 'month':
+    default:
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      break;
+  }
+  
+  const dailyRevenueMap = {};
+  let tempDate = new Date(periodStart);
+  while(tempDate <= periodEnd) {
+      const dateLabel = Utilities.formatDate(tempDate, TIMEZONE, 'dd/MM');
+      dailyRevenueMap[dateLabel] = { dateLabel: dateLabel, revenue: 0 };
+      tempDate.setDate(tempDate.getDate() + 1);
+  }
+
+  const customerFirstOrderDate = {};
+  allData.forEach(row => {
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    const maKH = (row[COL_DH_MA_KH] || '').trim();
+    const tenKH = (row[COL_DH_TEN_KH] || '').trim();
+    const customerKey = maKH || `VL_${tenKH}`;
+    if (customerKey && createDate instanceof Date) {
+      if (!customerFirstOrderDate[customerKey] || createDate < customerFirstOrderDate[customerKey]) {
+        customerFirstOrderDate[customerKey] = createDate;
+      }
+    }
+  });
+  
+  const customersThisPeriod = new Set();
+  const dataInPeriod = allData.filter(row => row[COL_DH_THOI_GIAN_TAO] instanceof Date && row[COL_DH_THOI_GIAN_TAO] >= periodStart && row[COL_DH_THOI_GIAN_TAO] <= periodEnd);
+
+  dataInPeriod.forEach(row => {
+    let revenueWithVAT = parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+    let revenueWithoutVAT = parseFloat(row[COL_DH_TONG_TIEN_TRUOC_VAT] || 0);
+    const status = (row[COL_DH_TINH_TRANG] || 'N/A').trim();
+    const employeeName = (row[COL_DH_NHAN_VIEN] || 'Không xác định').trim();
+    const customerSource = (row[COL_DH_NGUON_KH] || 'Không xác định').trim();
+    const isCancelled = status === 'Đã hủy';
+
+    if (isCancelled) return;
+
+    if (revenueWithoutVAT === 0 && row[COL_DH_VAT_RATE] === '' && revenueWithVAT > 0) {
+      revenueWithoutVAT = revenueWithVAT;
+    }
+
+    stats.ordersInPeriod++; 
+    stats.revenueInPeriodWithVAT += revenueWithVAT; 
+    stats.revenueInPeriodWithoutVAT += revenueWithoutVAT;
+    stats.salesByEmployee[employeeName] = (stats.salesByEmployee[employeeName] || 0) + revenueWithVAT; 
+    if (customerSource) stats.sourceCounts[customerSource] = (stats.sourceCounts[customerSource] || 0) + 1;
+    stats.designRevenueInPeriod += parseFloat(row[COL_DH_PHI_THIET_KE] || 0);
+    stats.largeFormatRevenueInPeriod += parseFloat(row[COL_DH_PHI_IN_KHO_LON] || 0);
+
+    const maKH = (row[COL_DH_MA_KH] || '').trim();
+    const tenKH = (row[COL_DH_TEN_KH] || '').trim();
+    const customerKey = maKH || `VL_${tenKH}`;
+    if (customerKey && !customersThisPeriod.has(customerKey)) {
+        customersThisPeriod.add(customerKey);
+        if (customerFirstOrderDate[customerKey] && customerFirstOrderDate[customerKey] >= periodStart) {
+          stats.lifecycleCounts['Khách mới']++;
+        } else {
+          stats.lifecycleCounts['Khách quay lại']++;
+        }
+    }
+    
+    if (status !== 'Đã hủy') {
+      stats.statusCounts[status] = (stats.statusCounts[status] || 0) + 1;
+    }
+
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    if(createDate instanceof Date){
+      const dateLabel = Utilities.formatDate(createDate, TIMEZONE, 'dd/MM');
+      if (dailyRevenueMap[dateLabel]) {
+        dailyRevenueMap[dateLabel].revenue += revenueWithVAT;
+      }
+    }
+  });
+  stats.salesByEmployee = Object.entries(stats.salesByEmployee).map(([name, sales]) => ({ name, sales })).sort((a, b) => b.sales - a.sales);
+  
+  stats.dailyRevenueInPeriod = Object.values(dailyRevenueMap);
+
+  return stats;
+}
+
+
+function getDebtOrders() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) return { debtOrders: [], overallTotalDebt: 0 };
+  const allOrders = sheet.getDataRange().getValues().slice(1);
+
+  let debtOrders = [];
+  let overallTotalDebt = 0;
+
+  allOrders.forEach((order, index) => {
+    const status = (order[COL_DH_TINH_TRANG] || '').toLowerCase();
+    const paymentStatus = (order[COL_DH_THANH_TOAN] || '').toLowerCase();
+    const remainingAmount = parseFloat(order[COL_DH_TIEN_CON_LAI] || 0);
+
+    if (status !== 'đã hủy' && paymentStatus === 'công nợ' && remainingAmount > 0) {
+      debtOrders.push(formatRowDataAsObject(order, index + 2));
+      overallTotalDebt += remainingAmount;
+    }
+  });
+  
+  return { debtOrders, overallTotalDebt };
+}
+
+function getUnpaidOrders() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  if (!sheet) return { unpaidOrders: [], overallTotalUnpaid: 0 };
+  const allOrders = sheet.getDataRange().getValues().slice(1);
+
+  let unpaidOrders = [];
+  let overallTotalUnpaid = 0;
+
+  allOrders.forEach((order, index) => {
+    const paymentStatus = (order[COL_DH_THANH_TOAN] || '').toLowerCase();
+    const orderStatus = (order[COL_DH_TINH_TRANG] || '').toLowerCase();
+    const remainingAmount = parseFloat(order[COL_DH_TIEN_CON_LAI] || 0);
+
+    if (orderStatus !== 'đã hủy' && (paymentStatus === 'chưa thanh toán' || paymentStatus === 'đã cọc') && remainingAmount > 0) {
+      unpaidOrders.push(formatRowDataAsObject(order, index + 2));
+      overallTotalUnpaid += remainingAmount;
+    }
+  });
+  
+  return { unpaidOrders, overallTotalUnpaid };
+}
+// =================================================================================
+// CÁC HÀM TIỆN ÍCH (Tiếp theo)
+// =================================================================================
+
+function generateCode(prefix, sheetName, colIndex, padding) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) throw new Error(`Sheet '${sheetName}' không tồn tại.`);
+    let count = sheet.getLastRow() > 1 ? sheet.getRange(2, colIndex + 1, sheet.getLastRow() - 1, 1).getValues().filter(r => r[0] && r[0].toString().startsWith(prefix)).length : 0;
+    return `${prefix}.${(count + 1).toString().padStart(padding, '0')}`;
+  } finally { lock.releaseLock(); }
+}
+
+function generateOrderCode() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+    if (!sheet) throw new Error("Sheet 'Donhang' không tồn tại.");
+    const now = getNowInVnTimezone();
+    const year = Utilities.formatDate(now, TIMEZONE, 'yy');
+    const month = Utilities.formatDate(now, TIMEZONE, 'MM');
+    const day = Utilities.formatDate(now, TIMEZONE, 'dd');
+    const yearPrefix = year + "PD";
+    let count = 0;
+    if (sheet.getLastRow() > 1) {
+        const codeColValues = sheet.getRange(2, COL_DH_MA_DON + 1, sheet.getLastRow() - 1, 1).getValues();
+        codeColValues.forEach(r => {
+            const code = r[0] ? r[0].toString().trim() : '';
+            if (!code.startsWith(yearPrefix)) return;
+            let codeMonth = (code.length > 8 && code.charAt(4) === '.') ? code.substring(7, 9) : (code.length > 7 ? code.substring(6, 8) : '');
+            if (codeMonth === month) count++;
+        });
+    }
+    const number = (count + 1).toString().padStart(4, '0');
+    return `${yearPrefix}${day}${month}.${number}`;
+  } finally { lock.releaseLock();
+  }
+}
+
+function generateCustomerCode() {
+  const year = Utilities.formatDate(getNowInVnTimezone(), TIMEZONE, 'yy');
+  return generateCode("KH" + year, 'Khachhang', COL_KH_MA_KH, 4);
+}
+
+function logAction(action, detail, oldData, newData) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Lichsu');
+    if (sheet) {
+      sheet.appendRow([getNowInVnTimezone(), Session.getActiveUser().getEmail(), action, detail, JSON.stringify(oldData || {}), JSON.stringify(newData || {})]);
+    } else {
+      Logger.log("Không thể tìm thấy sheet 'Lichsu'.");
+    }
+  } catch (e) {
+    Logger.log("Lỗi khi ghi lịch sử: " + e.toString());
+  }
+}
+
+function logCustomerAction(maKH, oldData, newData) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('LichsuKhachhang');
+    if (sheet) {
+      sheet.appendRow([
+        maKH,
+        getNowInVnTimezone(),
+        Session.getActiveUser().getEmail(),
+        JSON.stringify(oldData || {}),
+        JSON.stringify(newData || {})
+      ]);
+    } else {
+      Logger.log("Không thể tìm thấy sheet 'LichsuKhachhang'.");
+    }
+  } catch (e) {
+    Logger.log("Lỗi khi ghi lịch sử khách hàng: " + e.toString());
+  }
+}
+
+function exportReport(reportName, headers, data) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh", "Kế toán"])) throw new Error("Bạn không có quyền xuất file.");
+  if (!data || data.length === 0) throw new Error("Không có dữ liệu để xuất.");
+  const ss = SpreadsheetApp.create(`${reportName}_${Utilities.formatDate(getNowInVnTimezone(), TIMEZONE, "yyyyMMdd_HHmm")}`);
+  const sheet = ss.getSheets()[0];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  if (data.length > 0) {
+    sheet.getRange(2, 1, data.length, headers.length).setValues(data);
+  }
+  sheet.autoResizeColumns(1, headers.length);
+  return ss.getUrl();
+}
+
+function exportDebtOrdersReport(debtOrders) {
+  const headers = ["Mã Đơn", "Mã KH", "Tên Khách Hàng", "Quy cách", "Trạng thái TT", "Tiền còn lại (VNĐ)", "Thời gian tạo", "Nhân Viên"];
+  const data = debtOrders.map(row => [ row.madon, row.maKH || 'Vãng lai', row.tenKH, htmlToPlainText(row.quycach), row.thanhtoan, row.tienConLai, row.thoigiantao, row.nhanvien ]);
+  return exportReport("Bao_cao_Cong_no_Tong_hop", headers, data);
+}
+
+function exportUnpaidReport(unpaidData) {
+  const headers = ["Mã Đơn", "Mã KH", "Tên Khách Hàng", "Quy cách", "Trạng thái TT", "Tiền còn lại (VNĐ)", "Thời gian tạo", "Nhân Viên"];
+  const data = unpaidData.map(row => [ row.madon, row.maKH || 'Vãng lai', row.tenKH, htmlToPlainText(row.quycach), row.thanhtoan, row.tienConLai, row.thoigiantao, row.nhanvien ]);
+  return exportReport("Bao_cao_Don_can_thu", headers, data);
+}
+
+// ... (Các hàm in phiếu, theo dõi, thông báo giữ nguyên) ...
+function createDocxFromTemplate(rowNumber, templateId, outputFileNamePrefix) {
+  if (!templateId) {
+    throw new Error("Chưa cấu hình ID cho file mẫu Google Docs.");
+  }
+
+  let orderData;
+  try {
+    orderData = getOrderById(rowNumber);
+    if (!orderData) throw new Error("Không tìm thấy dữ liệu đơn hàng.");
+
+    const user = getCurrentUserRole();
+    const customerDetails = getCustomerDetails(orderData.maKH) || {};
+
+    const templateFile = DriveApp.getFileById(templateId);
+    const tempFileName = `Temp - ${orderData.madon} - ${new Date().getTime()}`;
+    const tempFolder = DriveApp.getRootFolder();
+    const newFile = templateFile.makeCopy(tempFileName, tempFolder);
+    const doc = DocumentApp.openById(newFile.getId());
+    const body = doc.getBody();
+
+    const thoigiantaoString = orderData.thoigiantao || '';
+    const parts = thoigiantaoString.split(',');
+    const ngayDatHang = (parts.length > 1 ? parts[1] : parts[0]).trim();
+
+    const replacements = {
+      '{{MA_DON_HANG}}': orderData.madon || '',
+      '{{NGAY_DAT_HANG}}': ngayDatHang || '',
+      '{{TEN_KHACH_HANG}}': orderData.tenKH || '',
+      '{{MA_KHACH_HANG}}': orderData.maKH || 'Vãng lai',
+      '{{SO_DIEN_THOAI}}': customerDetails.sdt || orderData.sdt || '',
+      '{{EMAIL}}': customerDetails.email || orderData.email || '',
+      '{{DIA_CHI}}': orderData.diachi || customerDetails.diachi || '',
+      '{{NHAN_VIEN_KINH_DOANH}}': orderData.nhanvien || '',
+      '{{QUY_CACH}}': htmlToPlainText(orderData.quycach),
+      '{{GHI_CHU_DON_HANG}}': htmlToPlainText(orderData.ghiChuDonHang),
+      '{{TONG_TIEN_TRUOC_VAT}}': (orderData.tongTienTruocVAT || 0).toLocaleString('vi-VN') + ' VNĐ',
+      '{{TIEN_VAT}}': (orderData.tienVAT || 0).toLocaleString('vi-VN') + ' VNĐ',
+      '{{TONG_TIEN_SAU_VAT}}': (orderData.tongTienSauVAT || 0).toLocaleString('vi-VN') + ' VNĐ',
+      '{{TIEN_COC}}': (orderData.tienCoc || 0).toLocaleString('vi-VN') + ' VNĐ',
+      '{{TIEN_CON_LAI}}': (orderData.tienConLai || 0).toLocaleString('vi-VN') + ' VNĐ',
+      '{{THANH_TOAN}}': orderData.thanhtoan || '',
+      '{{NGAY_GIAO_HANG}}': orderData.giaohang ? Utilities.formatDate(new Date(orderData.giaohang), TIMEZONE, 'HH:mm dd/MM/yyyy') : 'Chưa xác định',
+      '{{UU_TIEN}}': orderData.uutien === 'Gấp' ? 'GẤP' : '',
+      '{{NGUOI_TAO_PHIEU}}': user.name || '',
+      '{{NGAY_IN_PHIEU}}': Utilities.formatDate(getNowInVnTimezone(), TIMEZONE, 'HH:mm:ss, dd/MM/yyyy')
+    };
+
+    for (const placeholder in replacements) {
+      body.replaceText(placeholder, replacements[placeholder]);
+    }
+    doc.saveAndClose();
+
+    const newFileName = `${outputFileNamePrefix} - ${orderData.madon}.docx`;
+    const url = `https://docs.google.com/feeds/download/documents/export/Export?id=${newFile.getId()}&exportFormat=docx`;
+    const params = {
+      method: "get",
+      headers: { "Authorization": "Bearer " + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    };
+    const blob = UrlFetchApp.fetch(url, params).getBlob().setName(newFileName);
+
+    const docxFile = tempFolder.createFile(blob);
+    const downloadUrl = docxFile.getDownloadUrl();
+
+    DriveApp.getFileById(newFile.getId()).setTrashed(true);
+    Utilities.sleep(10000);
+    DriveApp.getFileById(docxFile.getId()).setTrashed(true);
+
+    return downloadUrl;
+
+  } catch (e) {
+    Logger.log(e);
+    if (orderData && orderData.madon) {
+        const tempFiles = DriveApp.searchFiles(`title contains 'Temp - ${orderData.madon}'`);
+        while(tempFiles.hasNext()){
+          tempFiles.next().setTrashed(true);
+        }
+    }
+    throw new Error(`Đã xảy ra lỗi khi tạo file DOCX: ${e.message}`);
+  }
+}
+
+function createOrderPdf(rowNumber) {
+  return createDocxFromTemplate(rowNumber, TEMPLATE_ID, "Phiếu Đặt Hàng");
+}
+
+function createDeliveryNotePdf(rowNumber) {
+  return createDocxFromTemplate(rowNumber, DELIVERY_NOTE_TEMPLATE_ID, "Phiếu Giao Hàng");
+}
+
+function generateTrackingId() {
+  return Utilities.getUuid();
+}
+
+function sendDeliveryNotificationEmail(rowNumber) {
+  const userRoleInfo = getCurrentUserRole();
+  if (!checkPermission(userRoleInfo.role, ["Admin", "Nhân Viên Kinh Doanh", "Kế toán"])) {
+    throw new Error("Bạn không có quyền gửi thông báo.");
+  }
+
+  try {
+    const order = getOrderById(rowNumber);
+    if (!order) {
+      throw new Error("Không tìm thấy đơn hàng.");
+    }
+
+    const customer = getCustomerDetails(order.maKH);
+    if (!customer || !customer.email) {
+      throw new Error("Khách hàng không có địa chỉ email trong hệ thống.");
+    }
+
+    const trackingLink = `${TRACKING_URL_BASE}?MaTheoDoi=${order.maTheoDoi}`;
+
+    const subject = `Thông báo đơn hàng #${order.madon} đã sẵn sàng`;
+    const body = `
+      <p>Kính gửi quý khách ${order.tenKH},</p>
+      <p>Cửa hàng in ấn P&D xin trân trọng thông báo:</p>
+      <p>Đơn hàng với mã <strong>#${order.madon}</strong> của quý khách đã hoàn thành và sẵn sàng để được giao đi.</p>
+      <p>Quý khách có thể theo dõi trạng thái đơn hàng của mình tại đây: <a href="${trackingLink}">Link theo dõi</a></p>
+      <p>Chúng tôi sẽ liên hệ với quý khách để sắp xếp thời gian giao hàng trong thời gian sớm nhất.</p>
+      <p>Xin chân thành cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ của chúng tôi!</p>
+      <p>Trân trọng,<br><strong>P&D Print</strong></p>
+    `;
+
+    MailApp.sendEmail({
+      to: customer.email,
+      subject: subject,
+      htmlBody: body,
+      name: "P&D Print"
+    });
+
+    logAction("Gửi Email thông báo", order.madon, {}, { to: customer.email });
+    return { success: true, message: "Đã gửi email thông báo thành công!" };
+
+  } catch (e) {
+    logAction("Lỗi gửi Email", e.message, {}, {});
+    throw new Error(`Lỗi khi gửi email: ${e.message}`);
+  }
+}
+
+function generateMissingTrackingIds() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Donhang");
+  if (!sheet || sheet.getLastRow() < 2) {
+    SpreadsheetApp.getUi().alert("Sheet 'Donhang' không có dữ liệu để xử lý.");
+    return;
+  };
+
+  const range = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn());
+  const values = range.getValues();
+
+  const header = values[0];
+  const trackingIdColIndex = header.indexOf("MaTheoDoi");
+
+  if (trackingIdColIndex === -1) {
+     SpreadsheetApp.getUi().alert("Sheet 'Donhang' thiếu cột 'MaTheoDoi'. Vui lòng thêm cột và chạy lại.");
+     return;
+  }
+
+  let updatedCount = 0;
+  let changed = false;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][COL_DH_MA_DON] && !values[i][trackingIdColIndex]) {
+      values[i][trackingIdColIndex] = generateTrackingId();
+      changed = true;
+      updatedCount++;
+    }
+  }
+
+  if (changed) {
+    range.setValues(values);
+    SpreadsheetApp.getUi().alert(`Hoàn tất! Đã tạo mã theo dõi cho ${updatedCount} đơn hàng cũ.`);
+  } else {
+    SpreadsheetApp.getUi().alert("Tất cả đơn hàng đã có mã theo dõi.");
+  }
+}
+
+
+// =================================================================================
+// CHỨC NĂNG TÍNH THƯỞNG HOA HỒNG
+// =================================================================================
+
+/**
+ * [NÂNG CẤP V28.1] Tính thưởng Hoa hồng NVKD với kiểm tra quyền.
+ * - Trả về chi tiết các mốc chính sách để hiển thị trên UI.
+ */
+function calculateSalesCommission(options) {
+  let { employeeName, startDate, endDate } = options; // Lấy employeeName từ options
+  const userRoleInfo = getCurrentUserRole();
+
+  // 1. Kiểm tra quyền của Kế toán
+  if (userRoleInfo.role === 'Kế toán') {
+    throw new Error("Kế toán không có quyền truy cập chức năng này.");
+  }
+
+  // 2. Nếu là NVKD, bắt buộc chỉ xem được của chính mình
+  if (userRoleInfo.role === 'Nhân Viên Kinh Doanh') {
+    if (employeeName && employeeName !== userRoleInfo.name) {
+       Logger.log(`NVKD ${userRoleInfo.name} đang cố xem thưởng của ${employeeName}. Bị chặn.`);
+       throw new Error("Bạn chỉ được phép xem báo cáo thưởng của chính mình.");
+    }
+    employeeName = userRoleInfo.name; // Luôn lấy tên của người dùng hiện tại
+  }
+
+  // 3. Kiểm tra dữ liệu đầu vào (Admin hoặc NVKD đã được xác định tên)
+  if (!employeeName || !startDate || !endDate) {
+    throw new Error("Vui lòng cung cấp đủ thông tin: Tên nhân viên, ngày bắt đầu, ngày kết thúc.");
+  }
+
+  // --- Phần logic tính toán và lấy dữ liệu chính sách ---
+  const kpiSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Chinhsach_Hoahong_NVKD');
+  const bonusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Chinhsach_ThuongThang');
+  if (!kpiSheet || !bonusSheet) throw new Error("Không tìm thấy sheet 'Chinhsach_Hoahong_NVKD' hoặc 'Chinhsach_ThuongThang'.");
+
+  const kpiData = kpiSheet.getDataRange().getValues();
+  const bonusData = bonusSheet.getDataRange().getValues().slice(1).sort((a,b) => b[0] - a[0]); // Sắp xếp giảm dần
+
+  // [NÂNG CẤP V28.1] Lấy toàn bộ chính sách cá nhân để gửi về UI
+  const allKpiPolicies = kpiData.slice(1).map(row => ({
+      name: (row[0] || '').trim(),
+      moc1_ds: parseFloat(row[1] || 0), pt1: parseFloat(row[2] || 0),
+      moc2_ds: parseFloat(row[3] || 0), pt2: parseFloat(row[4] || 0),
+                                        pt3: parseFloat(row[5] || 0)
+  }));
+  
+  // [NÂNG CẤP V28.1] Lấy toàn bộ chính sách thưởng tháng để gửi về UI
+  const allBonusPolicies = bonusData.map(row => ({
+      moc: parseFloat(row[0] || 0),
+      pt: parseFloat(row[1] || 0)
+  }));
+
+  const employeePolicy = allKpiPolicies.find(p => p.name === (employeeName || '').trim());
+  if (!employeePolicy) {
+      return { error: `Không tìm thấy chính sách KPI cho nhân viên: ${employeeName}. Vui lòng kiểm tra lại trang tính 'Chinhsach_Hoahong_NVKD'.` };
+  }
+  
+  // Giữ nguyên tên biến 'policy' cho logic tính toán bên dưới
+  const policy = employeePolicy; 
+
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  const donhangSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  const donhangData = donhangSheet.getDataRange().getValues().slice(1);
+
+  let personalSales = 0;
+  let totalGroupSales = 0;
+  const salesEmployees = getSalesEmployees(); // Lấy danh sách NVKD (hàm này đã có sẵn)
+
+  donhangData.forEach(row => {
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    const orderEmployee = (row[COL_DH_NHAN_VIEN] || '').trim();
+    const status = (row[COL_DH_TINH_TRANG] || '').toLowerCase().trim();
+
+    if (status !== 'đã hủy' && createDate instanceof Date && createDate >= startDateObj && createDate <= endDateObj) {
+      const saleAmount = parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+      if (orderEmployee === employeeName) {
+        personalSales += saleAmount;
+      }
+      // Chỉ tính doanh số nhóm nếu người dùng là Admin (để tính thưởng tháng)
+      if (userRoleInfo.role === 'Admin' && salesEmployees.includes(orderEmployee)) {
+        totalGroupSales += saleAmount;
+      }
+    }
+  });
+
+   // Nếu người dùng không phải Admin, doanh số nhóm không cần thiết để tính thưởng tháng cho họ
+   if (userRoleInfo.role !== 'Admin') {
+     totalGroupSales = 0; // Đặt về 0 để không tính thưởng nhóm
+   }
+
+  let personalCommission = 0;
+  if (personalSales < policy.moc1_ds) {
+    personalCommission = personalSales * policy.pt1;
+  } else if (personalSales >= policy.moc1_ds && personalSales < policy.moc2_ds) {
+    personalCommission = personalSales * policy.pt2;
+  } else {
+    const commissionPart1 = policy.moc2_ds * policy.pt2;
+    const commissionPart2 = (personalSales - policy.moc2_ds) * policy.pt3;
+    personalCommission = commissionPart1 + commissionPart2;
+  }
+
+  let monthlyBonusFund = 0, employeeBonus = 0, contributionRatio = 0;
+  let bonusPolicyApplied = null;
+
+  // Chỉ tính thưởng tháng nếu là Admin (vì cần totalGroupSales)
+  if (userRoleInfo.role === 'Admin') {
+    for(const bonus of allBonusPolicies) { // Dùng allBonusPolicies đã lấy
+      if(totalGroupSales >= bonus.moc) {
+        monthlyBonusFund = totalGroupSales * bonus.pt;
+        bonusPolicyApplied = bonus; // Lưu chính sách đã áp dụng
+        break;
+      }
+    }
+
+    if (monthlyBonusFund > 0 && totalGroupSales > 0) {
+      contributionRatio = personalSales / totalGroupSales;
+      employeeBonus = monthlyBonusFund * contributionRatio;
+    }
+  } else {
+    // Nếu không phải Admin, không có thưởng tháng
+    employeeBonus = 0;
+  }
+
+
+  return {
+    employeeName,
+    personalSales,
+    personalCommission,
+    totalGroupSales: userRoleInfo.role === 'Admin' ? totalGroupSales : null, // Chỉ trả về nếu là Admin
+    bonusPolicyApplied: userRoleInfo.role === 'Admin' ? bonusPolicyApplied : null, // Chỉ trả về nếu là Admin
+    monthlyBonusFund: userRoleInfo.role === 'Admin' ? monthlyBonusFund : null, // Chỉ trả về nếu là Admin
+    contributionRatio: userRoleInfo.role === 'Admin' ? contributionRatio : null, // Chỉ trả về nếu là Admin
+    employeeBonus,
+    totalIncome: personalCommission + employeeBonus,
+
+    // [NÂNG CẤP V28.1] Trả về chi tiết chính sách
+    policyApplied: employeePolicy, // Chính sách cá nhân của NV này
+    allKpiPolicies: allKpiPolicies, // Toàn bộ chính sách cá nhân
+    allBonusPolicies: allBonusPolicies // Toàn bộ chính sách thưởng tháng
+  };
+}
+
+
+/**
+ * [CẬP NHẬT V28.0] Tính thưởng hoa hồng cho nhân viên không phải NVKD với kiểm tra quyền.
+ * - Kế toán và NVKD không được xem.
+ * - NV khác chỉ xem được của chính mình.
+ * - Admin xem được tất cả.
+ */
+function calculateStaffCommission(options) {
+  let { employeeName, startDate, endDate } = options; // Lấy employeeName từ options
+  const userRoleInfo = getCurrentUserRole();
+
+  // 1. Kiểm tra quyền Kế toán và NVKD
+  if (userRoleInfo.role === 'Kế toán' || userRoleInfo.role === 'Nhân Viên Kinh Doanh') {
+    throw new Error(`Vai trò "${userRoleInfo.role}" không có quyền truy cập chức năng này.`);
+  }
+
+  // 2. Nếu không phải Admin, bắt buộc chỉ xem được của chính mình
+  if (userRoleInfo.role !== 'Admin') {
+     if (employeeName && employeeName !== userRoleInfo.name) {
+       Logger.log(`Nhân viên ${userRoleInfo.name} đang cố xem thưởng của ${employeeName}. Bị chặn.`);
+       throw new Error("Bạn chỉ được phép xem báo cáo thưởng của chính mình.");
+     }
+     employeeName = userRoleInfo.name; // Luôn lấy tên của người dùng hiện tại
+  }
+
+  // 3. Kiểm tra dữ liệu đầu vào (Admin hoặc NV khác đã được xác định tên)
+  if (!employeeName || !startDate || !endDate) {
+    throw new Error("Vui lòng cung cấp đủ thông tin.");
+  }
+
+  // --- Phần logic tính toán giữ nguyên như V27 ---
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const weightSheet = ss.getSheetByName('TrongSoCongViec');
+  const performanceSheet = ss.getSheetByName('Nhanvien_Danhgia');
+  const subTaskCommissionSheet = ss.getSheetByName('Chinhsach_Hoahong_CongdoanPhu');
+  if (!weightSheet || !performanceSheet || !subTaskCommissionSheet) {
+    throw new Error("Không tìm thấy một trong các sheet cài đặt: 'TrongSoCongViec', 'Nhanvien_Danhgia', 'Chinhsach_Hoahong_CongdoanPhu'.");
+  }
+
+  const weightData = weightSheet.getDataRange().getValues().slice(1);
+  const performanceData = performanceSheet.getDataRange().getValues().slice(1);
+  const subTaskData = subTaskCommissionSheet.getDataRange().getValues().slice(1);
+
+  const jobWeights = weightData.reduce((acc, row) => {
+    if (row[0] && row[1] !== undefined && row[1] !== null) acc[row[0].toString().trim()] = parseFloat(row[1]);
+    return acc;
+  }, {});
+
+  const subTaskCommissionRates = subTaskData.reduce((acc, row) => {
+    if (row[0] && row[1] !== undefined && row[1] !== null) acc[row[0].toString().trim()] = parseFloat(row[1]);
+    return acc;
+  }, {});
+
+  const employeePerformance = performanceData.find(row => (row[0] || '').trim() === (employeeName || '').trim());
+  if (!employeePerformance) {
+    return { error: `Không tìm thấy chính sách đánh giá cho nhân viên: "${employeeName}". Vui lòng kiểm tra lại tên trong trang tính 'Nhanvien_Danhgia'.` };
+  }
+
+  const performanceScore = parseFloat(employeePerformance[1] || 0);
+  const baseCommissionRate = parseFloat(employeePerformance[2] || 0);
+
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  const donhangSheet = ss.getSheetByName('Donhang');
+  const donhangData = donhangSheet ? donhangSheet.getDataRange().getValues().slice(1) : [];
+  const historySheet = ss.getSheetByName('Lichsu');
+  const historyData = historySheet ? historySheet.getDataRange().getValues().slice(1) : [];
+
+  const usersInfo = getUsersInfo();
+  const userEmail = Object.keys(usersInfo).find(email => usersInfo[email].name === employeeName);
+
+  let commissionFromMainJobs = 0;
+  let totalWeightedRevenue = 0;
+  const contributionDetails = {};
+  const processedMainJobsForCommission = new Set();
+  const participatedOrderIds = new Set();
+
+  const subTaskDetails = {};
+  Object.keys(subTaskCommissionRates).forEach(taskName => {
+      subTaskDetails[taskName] = {
+          orderCount: 0,
+          totalFeeValue: 0,
+          commissionRate: subTaskCommissionRates[taskName],
+          commissionAmount: 0,
+          orders: []
+      };
+  });
+  const processedSubTasksForCommission = new Set();
+
+  const orderMap = new Map(donhangData.map((row, index) => [row[COL_DH_MA_DON], {data: row, index: index + 2}]));
+
+  const addContributionDetail = (maDon, jobName, reason) => {
+      const detailKey = `${maDon}-${jobName}-${reason}`;
+      if (!contributionDetails[jobName]) {
+          contributionDetails[jobName] = [];
+      }
+      if (!contributionDetails[jobName].some(item => item.detailKey === detailKey)) {
+          contributionDetails[jobName].push({ maDon: maDon, congDoan: jobName, reason: reason, detailKey: detailKey });
+      }
+  };
+
+  const taskActionMap = {
+    "Cập nhật Trạng thái Thiết kế": { name: "Thiết kế", feeCol: COL_DH_PHI_THIET_KE },
+    "Cập nhật Trạng thái In Khổ Lớn": { name: "In Khổ Lớn", feeCol: COL_DH_PHI_IN_KHO_LON },
+    "Cập nhật Trạng thái Bế Demi": { name: "Bế Demi", feeCol: -1 },
+    "Cập nhật Trạng thái Gia công ngoài": { name: "Gia công ngoài", feeCol: -1 },
+    "Cập nhật Trạng thái Ép Kim": { name: "Ép Kim", feeCol: -1 },
+  };
+  const commissionableSubTaskNames = Object.keys(subTaskCommissionRates);
+
+  if(userEmail){
+    historyData.forEach((entry) => {
+      const timestamp = entry[COL_LS_TIMESTAMP];
+      if (!(timestamp instanceof Date) || timestamp < startDateObj || timestamp > endDateObj) return;
+
+      const actionUserEmail = (entry[COL_LS_USER] || '').trim().toLowerCase();
+      if (actionUserEmail !== userEmail.toLowerCase()) return;
+
+      const action = entry[COL_LS_ACTION] ? entry[COL_LS_ACTION].trim() : '';
+      const maDon = entry[COL_LS_DETAIL];
+      const orderInfo = orderMap.get(maDon);
+
+      if (!maDon) return;
+
+      let countsAsParticipation = false;
+      let jobNameForDetail = null;
+      let reasonForDetail = "";
+
+      if (action === "Tham gia công đoạn Bình File") {
+          countsAsParticipation = true; jobNameForDetail = "Bình File"; reasonForDetail = "(Tham gia)";
+      } else if (action === "Tham gia công đoạn In") {
+          countsAsParticipation = true; jobNameForDetail = "In"; reasonForDetail = "(Tham gia)";
+      } else if (action === "Tham gia công đoạn Thành Phẩm") {
+          countsAsParticipation = true; jobNameForDetail = "Thành Phẩm"; reasonForDetail = "(Tham gia)";
+      }
+      else if (action === "Cập nhật trạng thái") {
+          countsAsParticipation = true;
+          try {
+              const oldData = JSON.parse(entry[COL_LS_OLD_DATA] || '{}');
+              if (oldData.old) {
+                  jobNameForDetail = oldData.old;
+                  reasonForDetail = "(Hoàn thành qua Cập nhật trạng thái)";
+
+                  if (orderInfo && (orderInfo.data[COL_DH_TINH_TRANG] || '').toLowerCase() !== 'đã hủy') {
+                     const revenue = parseFloat(orderInfo.data[COL_DH_TONG_TIEN_TRUOC_VAT] || 0);
+                     const processKeyCommission = `${maDon}-${jobNameForDetail}-commission`;
+                     const weight = jobWeights[jobNameForDetail] || 0;
+                     if (weight > 0 && revenue > 0 && !processedMainJobsForCommission.has(processKeyCommission)) {
+                          totalWeightedRevenue += revenue * weight;
+                          processedMainJobsForCommission.add(processKeyCommission);
+                     }
+                  }
+              } else {
+                  jobNameForDetail = action; reasonForDetail = "";
+              }
+          } catch (e) {
+              jobNameForDetail = action; reasonForDetail = "";
+          }
+      }
+      else {
+          const subTaskInfo = taskActionMap[action];
+          if (subTaskInfo) {
+              try {
+                  const newData = JSON.parse(entry[COL_LS_NEW_DATA] || '{}');
+                  if (newData.new === 'Đã hoàn thành') {
+                      countsAsParticipation = true;
+                      jobNameForDetail = subTaskInfo.name;
+                      reasonForDetail = "(Hoàn thành CĐ phụ)";
+
+                      if (orderInfo && (orderInfo.data[COL_DH_TINH_TRANG] || '').toLowerCase() !== 'đã hủy' && commissionableSubTaskNames.includes(jobNameForDetail)) {
+                          const processKeyCommission = `${maDon}-${jobNameForDetail}-commission`;
+                          if (!processedSubTasksForCommission.has(processKeyCommission)) {
+                              const feeColIndex = subTaskInfo.feeCol;
+                              if (feeColIndex >= 0 && feeColIndex < orderInfo.data.length) {
+                                  const fee = parseFloat(orderInfo.data[feeColIndex] || 0);
+                                  const rate = subTaskCommissionRates[jobNameForDetail] || 0;
+                                  if (fee > 0 && rate > 0) {
+                                      subTaskDetails[jobNameForDetail].orderCount++;
+                                      subTaskDetails[jobNameForDetail].totalFeeValue += fee;
+                                      subTaskDetails[jobNameForDetail].commissionAmount += fee * rate;
+                                      if (!subTaskDetails[jobNameForDetail].orders.some(item => item.maDon === maDon)) {
+                                          subTaskDetails[jobNameForDetail].orders.push({ maDon: maDon, congDoan: jobNameForDetail });
+                                      }
+                                      processedSubTasksForCommission.add(processKeyCommission);
+                                  }
+                              }
+                          }
+                      }
+                  }
+              } catch (e) { /* Ignore JSON parse errors */ }
+          }
+      }
+
+      if (countsAsParticipation) {
+          participatedOrderIds.add(maDon);
+          if (jobNameForDetail) {
+              addContributionDetail(maDon, jobNameForDetail, reasonForDetail);
+          }
+      }
+    });
+  }
+
+  donhangData.forEach(row => {
+    const createDate = row[COL_DH_THOI_GIAN_TAO];
+    const status = (row[COL_DH_TINH_TRANG] || '').toLowerCase().trim();
+    if (status === 'đã hủy' || !(createDate instanceof Date) || createDate < startDateObj || createDate > endDateObj) return;
+
+    const revenue = parseFloat(row[COL_DH_TONG_TIEN_TRUOC_VAT] || 0);
+    const maDon = row[COL_DH_MA_DON];
+
+    const checkParticipationForCommission = (participants, jobName) => {
+      if ((participants || '').includes(employeeName)) {
+        participatedOrderIds.add(maDon);
+        addContributionDetail(maDon, jobName, "(Tham gia - DS cuối)");
+
+        const processKeyCommission = `${maDon}-${jobName}-commission`;
+        const weight = jobWeights[jobName] || 0;
+        if (weight > 0 && revenue > 0 && !processedMainJobsForCommission.has(processKeyCommission)) {
+            totalWeightedRevenue += revenue * weight;
+            processedMainJobsForCommission.add(processKeyCommission);
+        }
+      }
+    };
+
+    checkParticipationForCommission(row[COL_DH_BINH_FILE_PARTICIPANTS], 'Bình File');
+    checkParticipationForCommission(row[COL_DH_IN_PARTICIPANTS], 'In');
+    checkParticipationForCommission(row[COL_DH_THANH_PHAM_PARTICIPANTS], 'Thành Phẩm');
+  });
+
+  const actualCommissionRate = performanceScore * baseCommissionRate;
+  commissionFromMainJobs = totalWeightedRevenue * actualCommissionRate;
+  const commissionFromSubTasks = Object.values(subTaskDetails).reduce((sum, task) => sum + task.commissionAmount, 0);
+  const totalCommissionAmount = commissionFromMainJobs + commissionFromSubTasks;
+
+  return {
+    employeeName: employeeName,
+    participatedOrdersCount: participatedOrderIds.size,
+    weightedRevenueBasis: totalWeightedRevenue,
+    commissionFromMainJobs: commissionFromMainJobs,
+    commissionFromSubTasks: commissionFromSubTasks,
+    totalCommissionAmount: totalCommissionAmount,
+    contributionDetails: contributionDetails,
+    subTaskDetails: subTaskDetails,
+    baseCommissionRate: baseCommissionRate,
+    performanceScore: performanceScore
+  };
+}
+
+
+/**
+ * [TÍNH NĂNG MỚI V28.1] Xuất báo cáo tổng hợp thưởng cho tất cả nhân viên.
+ * Chỉ dành cho Admin.
+ */
+function exportAllCommissions(options) {
+  const userRoleInfo = getCurrentUserRole();
+  if (userRoleInfo.role !== 'Admin') {
+    throw new Error("Bạn không có quyền thực hiện chức năng này.");
+  }
+
+  const { startDate, endDate } = options;
+  if (!startDate || !endDate) {
+    throw new Error("Vui lòng cung cấp ngày bắt đầu và ngày kết thúc.");
+  }
+
+  const ss = SpreadsheetApp.create(`BaoCaoThuongTongHop_${Utilities.formatDate(getNowInVnTimezone(), TIMEZONE, "yyyyMMdd")}`);
+  
+  // Lấy danh sách nhân viên
+  const salesEmployees = getSalesEmployees();
+  const allEmployees = getAllEmployees();
+  const otherStaff = allEmployees.filter(e => !salesEmployees.includes(e) && e.trim() !== '');
+
+  // Xử lý Thưởng NVKD
+  const salesSheet = ss.getSheets()[0].setName("Thưởng NVKD");
+  const salesHeaders = [
+    "Tên NVKD", "Doanh số cá nhân (DS Gồm VAT)", "Hoa hồng cá nhân", 
+    "Doanh số nhóm", "Quỹ thưởng tháng", "Tỷ lệ đóng góp", "Thưởng tháng", 
+    "Tổng thu nhập"
+  ];
+  const salesReportData = [];
+
+  let totalGroupSalesForPeriod = 0; // Cần tính tổng DS nhóm trước
+  const donhangSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Donhang');
+  const donhangData = donhangSheet.getDataRange().getValues().slice(1);
+  const startDateObj = new Date(startDate + 'T00:00:00');
+  const endDateObj = new Date(endDate + 'T23:59:59');
+
+  donhangData.forEach(row => {
+      const createDate = row[COL_DH_THOI_GIAN_TAO];
+      const orderEmployee = (row[COL_DH_NHAN_VIEN] || '').trim();
+      const status = (row[COL_DH_TINH_TRANG] || '').toLowerCase().trim();
+      if (status !== 'đã hủy' && createDate instanceof Date && createDate >= startDateObj && createDate <= endDateObj) {
+          if (salesEmployees.includes(orderEmployee)) {
+              totalGroupSalesForPeriod += parseFloat(row[COL_DH_TONG_TIEN_SAU_VAT] || 0);
+          }
+      }
+  });
+
+  // Bây giờ lặp lại và tính toán cho từng NVKD
+  salesEmployees.forEach(name => {
+    try {
+      // Gọi hàm calculateSalesCommission với totalGroupSales đã tính sẵn (để tối ưu)
+      // Lưu ý: hàm calculateSalesCommission nội bộ vẫn tính lại, nhưng kết quả sẽ khớp
+      const result = calculateSalesCommission({ employeeName: name, startDate, endDate });
+      if (result.error) {
+        salesReportData.push([name, result.error, 0, 0, 0, 0, 0, 0]);
+      } else {
+        salesReportData.push([
+          result.employeeName,
+          result.personalSales,
+          result.personalCommission,
+          result.totalGroupSales,
+          result.monthlyBonusFund,
+          result.contributionRatio,
+          result.employeeBonus,
+          result.totalIncome
+        ]);
+      }
+    } catch (e) {
+      salesReportData.push([name, `Lỗi: ${e.message}`, 0, 0, 0, 0, 0, 0]);
+    }
+  });
+
+  // Ghi dữ liệu NVKD
+  salesSheet.getRange(1, 1, 1, salesHeaders.length).setValues([salesHeaders]).setFontWeight('bold');
+  if (salesReportData.length > 0) {
+    salesSheet.getRange(2, 1, salesReportData.length, salesHeaders.length).setValues(salesReportData)
+             .setNumberFormat("#,##0"); // Định dạng số
+    salesSheet.getRange(2, 6, salesReportData.length, 1).setNumberFormat("0.00%"); // Định dạng %
+  }
+  salesSheet.autoResizeColumns(1, salesHeaders.length);
+
+  // Xử lý Thưởng NV Khác
+  const staffSheet = ss.insertSheet("Thưởng NV Khác");
+  const staffHeaders = [
+    "Tên NV", "Số đơn tham gia", "Doanh số có trọng số (DS Chưa VAT)", 
+    "Hệ số HH", "Hệ số KQ", "Thưởng CV chính", 
+    "Thưởng CĐ phụ (TK)", "Thưởng CĐ phụ (In KL)", "Tổng thưởng CĐ phụ",
+    "Tổng thu nhập"
+  ];
+  const staffReportData = [];
+
+  otherStaff.forEach(name => {
+    try {
+      const result = calculateStaffCommission({ employeeName: name, startDate, endDate });
+      if (result.error) {
+        staffReportData.push([name, result.error, 0, 0, 0, 0, 0, 0, 0, 0]);
+      } else {
+        const commissionThietKe = result.subTaskDetails["Thiết kế"] ? result.subTaskDetails["Thiết kế"].commissionAmount : 0;
+        const commissionInKhoLon = result.subTaskDetails["In Khổ Lớn"] ? result.subTaskDetails["In Khổ Lớn"].commissionAmount : 0;
+        
+        staffReportData.push([
+          result.employeeName,
+          result.participatedOrdersCount,
+          result.weightedRevenueBasis,
+          result.baseCommissionRate,
+          result.performanceScore,
+          result.commissionFromMainJobs,
+          commissionThietKe,
+          commissionInKhoLon,
+          result.commissionFromSubTasks,
+          result.totalCommissionAmount
+        ]);
+      }
+    } catch (e) {
+      staffReportData.push([name, `Lỗi: ${e.message}`, 0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+  });
+
+  // Ghi dữ liệu NV Khác
+  staffSheet.getRange(1, 1, 1, staffHeaders.length).setValues([staffHeaders]).setFontWeight('bold');
+  if (staffReportData.length > 0) {
+    staffSheet.getRange(2, 1, staffReportData.length, staffHeaders.length).setValues(staffReportData)
+              .setNumberFormat("#,##0"); // Định dạng số
+    staffSheet.getRange(2, 4, staffReportData.length, 1).setNumberFormat("0.00%"); // Định dạng %
+  }
+  staffSheet.autoResizeColumns(1, staffHeaders.length);
+
+  // Trả về URL
+  return ss.getUrl();
+}

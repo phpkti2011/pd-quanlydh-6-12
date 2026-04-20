@@ -1,0 +1,5 @@
+{
+  "name": "P&D Order Manager",
+  "description": "A comprehensive order management system for printing businesses featuring dashboards, Kanban boards, and financial reporting.",
+  "requestFramePermissions": []
+}

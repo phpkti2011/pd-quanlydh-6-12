@@ -1,0 +1,21 @@
+{
+  "name": "P&D Order Manager",
+  "short_name": "P&D Orders",
+  "description": "Quản lý đơn hàng P&D",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9488",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

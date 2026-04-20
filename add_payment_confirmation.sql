@@ -1,0 +1,4 @@
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_confirmed BOOLEAN DEFAULT FALSE;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method_deposit TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method_remaining TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_note TEXT;

@@ -1,0 +1,5 @@
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_info TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_code TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_confirmed_by UUID REFERENCES profiles(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_confirmed_at TIMESTAMPTZ;

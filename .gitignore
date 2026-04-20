@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+dist-ssr/
+build/
+.next/
+out/
+
+# Environment & secrets
+.env
+.env.*
+.env.local
+*.local
+credentials.json
+serviceAccountKey.json
+*.pem
+*.key
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE settings
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temp & backup files
+*.tmp
+*.bak
+*.zip
+
+# Debug/test output
+debug_output.txt
+output.log
+output.txt
+sql_error.log
+sql_output.log
+test_comm.txt
+test_hybrid_result.txt
+temp_logo_base64.txt
+
+# Vercel
+.vercel/
+
+# Python
+__pycache__/
+.venv/
+venv/
+vendor/
