@@ -183,31 +183,18 @@ export const commissionService = {
     /**
      * Upsert a Production Tier
      */
-    async upsertProductionTier(id: string | null, tier: { threshold_min: number; threshold_max: number | null; rate: number }) {
-        if (id) {
-            const { error } = await supabase
-                .from('commission_policies')
-                .update({ threshold_min: tier.threshold_min, threshold_max: tier.threshold_max, rate: tier.rate })
-                .eq('id', id);
-            if (error) throw error;
-        } else {
-            // apply_to must be unique per policy_type, use timestamp to generate unique key
-            const applyTo = `TIER_${Date.now()}`;
-            const { error } = await supabase
-                .from('commission_policies')
-                .insert({ policy_type: 'PRODUCTION_TIER', apply_to: applyTo, ...tier });
-            if (error) throw error;
-        }
-    },
-
     /**
-     * Delete a Production Tier
+     * Save all production tiers at once via RPC (bypasses RLS)
      */
-    async deleteProductionTier(id: string) {
-        const { error } = await supabase
-            .from('commission_policies')
-            .delete()
-            .eq('id', id);
+    async saveProductionTiers(tiers: { threshold_min: number; threshold_max: number | null; rate: number }[]) {
+        const payload = tiers.map(t => ({
+            min: t.threshold_min,
+            max: t.threshold_max,
+            rate: t.rate
+        }));
+        const { error } = await supabase.rpc('save_production_tiers', {
+            p_tiers: JSON.stringify(payload)
+        });
         if (error) throw error;
     },
 

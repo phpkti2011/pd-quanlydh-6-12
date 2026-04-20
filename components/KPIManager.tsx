@@ -482,24 +482,17 @@ const ProductionTierTab: React.FC<{ month: number; year: number }> = ({ month, y
     const handleSave = async () => {
         setSaving(true);
         try {
-            // Delete old tiers that are no longer in the list
-            const editIds = new Set(editTiers.filter(t => t.id).map(t => t.id));
-            for (const old of tiers) {
-                if (!editIds.has(old.id)) {
-                    await commissionService.deleteProductionTier(old.id);
-                }
-            }
-            // Upsert all tiers
-            for (const tier of editTiers) {
-                await commissionService.upsertProductionTier(tier.id, {
-                    threshold_min: tier.threshold_min,
-                    threshold_max: tier.threshold_max,
-                    rate: tier.rate
-                });
-            }
+            await commissionService.saveProductionTiers(
+                editTiers.map(t => ({
+                    threshold_min: t.threshold_min || 0,
+                    threshold_max: t.threshold_max,
+                    rate: t.rate || 0
+                }))
+            );
             alert('Đã lưu cấu hình mốc thưởng sản xuất!');
             await loadData();
         } catch (err: any) {
+            console.error('Save production tiers error:', err);
             alert('Lỗi lưu: ' + err.message);
         }
         setSaving(false);
