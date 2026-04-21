@@ -12,14 +12,14 @@ function formatMoney(amount: number): string {
   return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
 }
 
-function buildNotificationMessage(summary: any, month: number): string {
+function buildNotificationMessage(summary: any, month: number, year: number): string {
   const { total_revenue, current_tier_pct, next_tier_threshold, next_tier_pct, all_tiers } = summary;
 
-  let msg = `Doanh số tháng ${month}: ${formatMoney(total_revenue)} (chưa VAT).\n`;
-  msg += `Mốc thưởng hiện tại: ${current_tier_pct}% hoa hồng sản xuất.`;
+  let msg = `Doanh số hoàn thành trong tháng ${month}/${year}: ${formatMoney(total_revenue)} (chưa VAT).`;
+  msg += `\n\nMốc thưởng hiện tại: ${current_tier_pct}% hoa hồng sản xuất.`;
 
   if (current_tier_pct === 0) {
-    msg += `\nChưa đạt mốc thưởng.`;
+    msg += ` (Chưa đạt mốc thưởng)`;
   }
 
   if (next_tier_threshold && next_tier_pct) {
@@ -30,15 +30,23 @@ function buildNotificationMessage(summary: any, month: number): string {
     }
   }
 
-  // Add all tiers info
+  // Show all tiers
   if (all_tiers && all_tiers.length > 0) {
-    msg += `\n\nCác mốc thưởng:`;
+    msg += `\n\nCác mốc thưởng hoa hồng sản xuất:`;
+    // Below minimum threshold = 0%
+    const minThreshold = Math.min(...all_tiers.map((t: any) => t.min));
+    msg += `\n• Dưới ${formatMoney(minThreshold)}: 0%`;
     for (const tier of all_tiers) {
-      const maxLabel = tier.max ? formatMoney(tier.max) : '∞';
-      const isActive = total_revenue >= tier.min && (tier.max === null || total_revenue < tier.max);
-      msg += `\n${isActive ? '→ ' : '  '}${formatMoney(tier.min)} - ${maxLabel}: ${tier.rate}%`;
+      const maxLabel = tier.max ? formatMoney(tier.max) : 'trở lên';
+      const rangeLabel = tier.max
+        ? `${formatMoney(tier.min)} - ${maxLabel}`
+        : `${formatMoney(tier.min)} ${maxLabel}`;
+      const marker = total_revenue >= tier.min && (tier.max === null || total_revenue < tier.max) ? ' ← hiện tại' : '';
+      msg += `\n• ${rangeLabel}: ${tier.rate}%${marker}`;
     }
   }
+
+  msg += `\n\nCông thức: Thưởng thực nhận = (Thưởng CV chính + CV phụ) × ${current_tier_pct}%`;
 
   return msg;
 }
@@ -83,11 +91,11 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, message: 'No summary data available' });
     }
 
-    // Get all eligible employees (exclude NhanVienKinhDoanh and Khach)
+    // Get production staff only
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .not('role', 'in', '("NhanVienKinhDoanh","Khach")');
+      .in('role', ['NhanVienSanXuat', 'QuanLySanXuat', 'NhanVienBinhFile', 'NhanVienThietKe']);
 
     if (profilesError) {
       console.error('Profiles error:', profilesError);
@@ -99,7 +107,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Build notification message
-    const message = buildNotificationMessage(summary, month);
+    const message = buildNotificationMessage(summary, month, year);
 
     // Insert notifications for each employee
     const notifications = profiles.map((p: any) => ({
