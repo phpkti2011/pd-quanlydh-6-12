@@ -186,15 +186,43 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         return result;
     }, [settledOrders, selectedMonth, selectedYear, searchTerm]);
 
-    const handleUndoPayment = async (order: any) => {
-        if (!confirm(`Hoàn tác duyệt công nợ đơn ${order.order_code}?\nĐơn sẽ trở về trạng thái Công Nợ.`)) return;
+    // Selection for settled tab
+    const [selectedSettledIds, setSelectedSettledIds] = useState<Set<string>>(new Set());
+
+    const toggleSettledSelectAll = () => {
+        if (selectedSettledIds.size === filteredSettled.length) {
+            setSelectedSettledIds(new Set());
+        } else {
+            setSelectedSettledIds(new Set(filteredSettled.map((o: any) => o.id)));
+        }
+    };
+
+    const toggleSettledSelect = (id: string) => {
+        const newSet = new Set(selectedSettledIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedSettledIds(newSet);
+    };
+
+    const handleUndoPayment = async (order?: any) => {
+        const targets = order ? [order] : settledOrders.filter(o => selectedSettledIds.has(o.id));
+        if (targets.length === 0) return;
+
+        const confirmMsg = targets.length === 1
+            ? `Hoàn tác duyệt công nợ đơn ${targets[0].order_code}?\nĐơn sẽ trở về trạng thái Công Nợ.`
+            : `Hoàn tác ${targets.length} đơn đã chọn về trạng thái Công Nợ?`;
+
+        if (!confirm(confirmMsg)) return;
         try {
-            await orderService.updateOrder(order.id, {
-                payment_status: 'CongNo',
-                deposit_amount: 0,
-                remaining_amount: order.total_amount
-            });
-            alert(`Đã hoàn tác đơn ${order.order_code} về trạng thái Công Nợ.`);
+            await Promise.all(targets.map(o =>
+                orderService.updateOrder(o.id, {
+                    payment_status: 'CongNo',
+                    deposit_amount: 0,
+                    remaining_amount: o.total_amount
+                })
+            ));
+            alert(`Đã hoàn tác ${targets.length} đơn về trạng thái Công Nợ.`);
+            setSelectedSettledIds(new Set());
             fetchData();
         } catch (err) {
             console.error(err);
@@ -577,14 +605,36 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
                 {/* Tab: Đã chốt */}
                 {activeTab === 'settled' && (
+                    <>
+                    {/* Bulk undo button */}
+                    {selectedSettledIds.size > 0 && (
+                        <div className="mb-3 flex items-center gap-3">
+                            <button
+                                onClick={() => handleUndoPayment()}
+                                className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition shadow-sm font-bold animate-pulse"
+                            >
+                                <i className="fa-solid fa-undo mr-2"></i>
+                                Hoàn tác ({selectedSettledIds.size}) đơn đã chọn
+                            </button>
+                            <span className="text-sm text-gray-500">Đã chọn {selectedSettledIds.size} / {filteredSettled.length} đơn</span>
+                        </div>
+                    )}
                     <div className="overflow-x-auto flex-grow rounded border border-gray-200">
                         <div className="p-3 bg-green-50 border-b border-green-200 text-sm text-green-700">
                             <i className="fa-solid fa-info-circle mr-1"></i>
-                            Danh sách đơn đã chốt thanh toán. Bấm <strong>"Hoàn tác"</strong> để đưa đơn về trạng thái Công Nợ (nếu chốt nhầm).
+                            Danh sách đơn đã chốt thanh toán. Chọn đơn và bấm <strong>"Hoàn tác"</strong> để đưa về trạng thái Công Nợ (nếu chốt nhầm).
                         </div>
                         <table className="min-w-full divide-y divide-gray-200 border-collapse text-sm">
                             <thead className="bg-gray-100 sticky top-0 z-10">
                                 <tr>
+                                    <th className="px-4 py-3 text-center w-12">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                                            checked={filteredSettled.length > 0 && selectedSettledIds.size === filteredSettled.length}
+                                            onChange={toggleSettledSelectAll}
+                                        />
+                                    </th>
                                     <th className="px-4 py-3 text-left font-bold text-gray-700">Mã Đơn</th>
                                     <th className="px-4 py-3 text-left font-bold text-gray-700">Khách Hàng</th>
                                     <th className="px-4 py-3 text-left font-bold text-gray-700">PT Kinh Doanh</th>
@@ -596,12 +646,28 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {loading ? (
-                                    <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 italic">Đang tải...</td></tr>
+                                    <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-500 italic">Đang tải...</td></tr>
                                 ) : filteredSettled.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">Không có đơn đã chốt trong khoảng thời gian này.</td></tr>
+                                    <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-500">Không có đơn đã chốt trong khoảng thời gian này.</td></tr>
                                 ) : (
                                     filteredSettled.map((order: any, idx: number) => (
-                                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                        <tr
+                                            key={idx}
+                                            className={`hover:bg-orange-50 transition-colors cursor-pointer ${selectedSettledIds.has(order.id) ? 'bg-orange-50' : ''}`}
+                                            onClick={(e) => {
+                                                if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).tagName !== 'INPUT') {
+                                                    toggleSettledSelect(order.id);
+                                                }
+                                            }}
+                                        >
+                                            <td className="px-4 py-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                                                    checked={selectedSettledIds.has(order.id)}
+                                                    onChange={() => toggleSettledSelect(order.id)}
+                                                />
+                                            </td>
                                             <td className="px-4 py-3 font-medium text-blue-600">{order.order_code}</td>
                                             <td className="px-4 py-3">{order.customer_name || 'Vãng lai'}</td>
                                             <td className="px-4 py-3 text-gray-600">{order.sales_rep_name}</td>
@@ -610,7 +676,10 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                             <td className="px-4 py-3 text-gray-500">{order.updated_at ? new Date(order.updated_at).toLocaleDateString('vi-VN') : '—'}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <button
-                                                    onClick={() => handleUndoPayment(order)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleUndoPayment(order);
+                                                    }}
                                                     className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs hover:bg-orange-200 font-semibold border border-orange-200 transition"
                                                     title="Hoàn tác về trạng thái Công Nợ"
                                                 >
@@ -623,6 +692,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
             </div>
         </div >
