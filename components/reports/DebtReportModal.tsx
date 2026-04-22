@@ -9,7 +9,9 @@ interface Props {
 }
 
 const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'debt' | 'settled'>('debt');
     const [orders, setOrders] = useState<any[]>([]);
+    const [settledOrders, setSettledOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<string>('ALL');
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
@@ -23,6 +25,20 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             const data = await orderService.getDebtOrders();
             if (data) {
                 setOrders(data);
+            }
+            // Fetch settled orders (DaThanhToan) for undo tab
+            const { data: settled } = await supabase
+                .from('orders')
+                .select('id, order_code, total_amount, deposit_amount, remaining_amount, payment_status, created_at, updated_at, customer:customers(name), sales_rep:profiles!sales_rep_id(full_name)')
+                .eq('payment_status', 'DaThanhToan')
+                .order('updated_at', { ascending: false })
+                .limit(200);
+            if (settled) {
+                setSettledOrders(settled.map((o: any) => ({
+                    ...o,
+                    customer_name: o.customer?.name || 'Vãng lai',
+                    sales_rep_name: o.sales_rep?.full_name || ''
+                })));
             }
         } catch (error) {
             console.error(error);
@@ -143,6 +159,46 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         } catch (err) {
             console.error(err);
             alert("Lỗi cập nhật đơn hàng");
+        }
+    };
+
+    // Filtered settled orders by month/year
+    const filteredSettled = useMemo(() => {
+        let result = settledOrders;
+        if (selectedMonth > 0) {
+            result = result.filter(o => {
+                const d = new Date(o.created_at);
+                return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+            });
+        } else if (selectedYear) {
+            result = result.filter(o => {
+                const d = new Date(o.created_at);
+                return d.getFullYear() === selectedYear;
+            });
+        }
+        if (searchTerm) {
+            const lowerTerm = searchTerm.toLowerCase();
+            result = result.filter(o =>
+                (o.customer_name?.toLowerCase().includes(lowerTerm)) ||
+                (o.order_code?.toLowerCase().includes(lowerTerm))
+            );
+        }
+        return result;
+    }, [settledOrders, selectedMonth, selectedYear, searchTerm]);
+
+    const handleUndoPayment = async (order: any) => {
+        if (!confirm(`Hoàn tác duyệt công nợ đơn ${order.order_code}?\nĐơn sẽ trở về trạng thái Công Nợ.`)) return;
+        try {
+            await orderService.updateOrder(order.id, {
+                payment_status: 'CongNo',
+                deposit_amount: 0,
+                remaining_amount: order.total_amount
+            });
+            alert(`Đã hoàn tác đơn ${order.order_code} về trạng thái Công Nợ.`);
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            alert("Lỗi hoàn tác");
         }
     };
 
@@ -302,6 +358,25 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     Quản Lý Công Nợ
                 </h2>
 
+                {/* Tabs */}
+                <div className="flex border-b border-gray-200 mb-4">
+                    <button
+                        className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'debt' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setActiveTab('debt')}
+                    >
+                        <i className="fa-solid fa-file-invoice-dollar mr-1"></i>
+                        Công nợ ({orders.length})
+                    </button>
+                    <button
+                        className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'settled' ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setActiveTab('settled')}
+                    >
+                        <i className="fa-solid fa-check-circle mr-1"></i>
+                        Đã chốt ({filteredSettled.length})
+                    </button>
+                </div>
+
+                {activeTab === 'debt' && (<>
                 {/* Dashboard Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex flex-col justify-center items-center shadow-sm">
@@ -498,6 +573,57 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         )}
                     </table>
                 </div>
+                </>)}
+
+                {/* Tab: Đã chốt */}
+                {activeTab === 'settled' && (
+                    <div className="overflow-x-auto flex-grow rounded border border-gray-200">
+                        <div className="p-3 bg-green-50 border-b border-green-200 text-sm text-green-700">
+                            <i className="fa-solid fa-info-circle mr-1"></i>
+                            Danh sách đơn đã chốt thanh toán. Bấm <strong>"Hoàn tác"</strong> để đưa đơn về trạng thái Công Nợ (nếu chốt nhầm).
+                        </div>
+                        <table className="min-w-full divide-y divide-gray-200 border-collapse text-sm">
+                            <thead className="bg-gray-100 sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-4 py-3 text-left font-bold text-gray-700">Mã Đơn</th>
+                                    <th className="px-4 py-3 text-left font-bold text-gray-700">Khách Hàng</th>
+                                    <th className="px-4 py-3 text-left font-bold text-gray-700">PT Kinh Doanh</th>
+                                    <th className="px-4 py-3 text-right font-bold text-gray-700">Tổng Tiền</th>
+                                    <th className="px-4 py-3 text-left font-bold text-gray-700">Ngày Tạo</th>
+                                    <th className="px-4 py-3 text-left font-bold text-gray-700">Ngày Chốt</th>
+                                    <th className="px-4 py-3 text-center font-bold text-gray-700">Thao Tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {loading ? (
+                                    <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 italic">Đang tải...</td></tr>
+                                ) : filteredSettled.length === 0 ? (
+                                    <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">Không có đơn đã chốt trong khoảng thời gian này.</td></tr>
+                                ) : (
+                                    filteredSettled.map((order: any, idx: number) => (
+                                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-3 font-medium text-blue-600">{order.order_code}</td>
+                                            <td className="px-4 py-3">{order.customer_name || 'Vãng lai'}</td>
+                                            <td className="px-4 py-3 text-gray-600">{order.sales_rep_name}</td>
+                                            <td className="px-4 py-3 text-right">{order.total_amount?.toLocaleString('vi-VN')}</td>
+                                            <td className="px-4 py-3 text-gray-500">{new Date(order.created_at).toLocaleDateString('vi-VN')}</td>
+                                            <td className="px-4 py-3 text-gray-500">{order.updated_at ? new Date(order.updated_at).toLocaleDateString('vi-VN') : '—'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <button
+                                                    onClick={() => handleUndoPayment(order)}
+                                                    className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs hover:bg-orange-200 font-semibold border border-orange-200 transition"
+                                                    title="Hoàn tác về trạng thái Công Nợ"
+                                                >
+                                                    <i className="fa-solid fa-undo mr-1"></i> Hoàn tác
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div >
     );
