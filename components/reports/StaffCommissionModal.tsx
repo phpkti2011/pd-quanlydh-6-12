@@ -253,32 +253,67 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
 
                         {/* Production Tier Banner */}
                         {tierSummary && results.length > 0 && (
-                            <div className={`mb-4 rounded-lg border-2 p-3 flex items-center justify-between ${
-                                tierSummary.current_tier_pct >= 150 ? 'bg-green-50 border-green-200 text-green-700' :
-                                tierSummary.current_tier_pct >= 100 ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                                tierSummary.current_tier_pct >= 70 ? 'bg-orange-50 border-orange-200 text-orange-700' :
-                                'bg-red-50 border-red-200 text-red-700'
-                            }`}>
-                                <div className="flex items-center gap-3">
-                                    <i className="fa-solid fa-chart-line text-lg"></i>
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            Doanh số tháng {selectedMonth}: <strong>{(tierSummary.total_revenue / 1000000).toFixed(0)} triệu</strong> (chưa VAT)
-                                        </p>
-                                        {tierSummary.next_tier_threshold && (
-                                            <p className="text-xs opacity-75 mt-0.5">
-                                                Mốc tiếp: {(tierSummary.next_tier_threshold / 1000000).toFixed(0)} triệu → {tierSummary.next_tier_pct}%
-                                                {' '}(còn thiếu {((tierSummary.next_tier_threshold - tierSummary.total_revenue) / 1000000).toFixed(0)} triệu)
+                            <div className="mb-4 rounded-lg border-2 border-purple-200 bg-purple-50 overflow-hidden">
+                                {/* Header: Revenue & Current Tier */}
+                                <div className={`p-3 flex items-center justify-between ${
+                                    tierSummary.current_tier_pct >= 150 ? 'bg-green-50 border-b border-green-200 text-green-700' :
+                                    tierSummary.current_tier_pct >= 100 ? 'bg-blue-50 border-b border-blue-200 text-blue-700' :
+                                    tierSummary.current_tier_pct >= 70 ? 'bg-orange-50 border-b border-orange-200 text-orange-700' :
+                                    'bg-red-50 border-b border-red-200 text-red-700'
+                                }`}>
+                                    <div className="flex items-center gap-3">
+                                        <i className="fa-solid fa-chart-line text-lg"></i>
+                                        <div>
+                                            <p className="text-sm font-medium">
+                                                Doanh số đơn hoàn thành tháng {selectedMonth}: <strong>{(tierSummary.total_revenue / 1000000).toFixed(0)} triệu</strong> (chưa VAT)
                                             </p>
+                                            {tierSummary.next_tier_threshold && (
+                                                <p className="text-xs opacity-75 mt-0.5">
+                                                    Mốc tiếp: {(tierSummary.next_tier_threshold / 1000000).toFixed(0)} triệu → {tierSummary.next_tier_pct}%
+                                                    {' '}(còn thiếu {((tierSummary.next_tier_threshold - tierSummary.total_revenue) / 1000000).toFixed(0)} triệu)
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-2xl font-bold">×{tierSummary.current_tier_pct}%</span>
+                                        {tierSummary.current_tier_pct === 0 && (
+                                            <p className="text-xs font-medium">Chưa đạt mốc</p>
                                         )}
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <span className="text-2xl font-bold">×{tierSummary.current_tier_pct}%</span>
-                                    {tierSummary.current_tier_pct === 0 && (
-                                        <p className="text-xs font-medium">Chưa đạt mốc</p>
-                                    )}
-                                </div>
+                                {/* All Tiers */}
+                                {tierSummary.all_tiers && tierSummary.all_tiers.length > 0 && (
+                                    <div className="px-3 py-2">
+                                        <p className="text-xs font-bold text-purple-700 mb-1.5">Các mốc thưởng hoa hồng sản xuất:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {/* Below min = 0% */}
+                                            <span className={`text-xs px-2 py-1 rounded-full border ${
+                                                tierSummary.current_tier_pct === 0
+                                                    ? 'bg-red-100 border-red-300 text-red-700 font-bold ring-2 ring-red-300'
+                                                    : 'bg-gray-100 border-gray-200 text-gray-500'
+                                            }`}>
+                                                &lt;{(Math.min(...tierSummary.all_tiers.map((t: any) => t.min)) / 1000000).toFixed(0)}tr: 0%
+                                            </span>
+                                            {tierSummary.all_tiers.map((tier: any, idx: number) => {
+                                                const isActive = tierSummary.total_revenue >= tier.min && (tier.max === null || tierSummary.total_revenue < tier.max);
+                                                const maxLabel = tier.max ? `${(tier.max / 1000000).toFixed(0)}tr` : '∞';
+                                                return (
+                                                    <span key={idx} className={`text-xs px-2 py-1 rounded-full border ${
+                                                        isActive
+                                                            ? tier.rate >= 150 ? 'bg-green-100 border-green-300 text-green-700 font-bold ring-2 ring-green-300'
+                                                            : tier.rate >= 100 ? 'bg-blue-100 border-blue-300 text-blue-700 font-bold ring-2 ring-blue-300'
+                                                            : 'bg-orange-100 border-orange-300 text-orange-700 font-bold ring-2 ring-orange-300'
+                                                            : 'bg-gray-100 border-gray-200 text-gray-500'
+                                                    }`}>
+                                                        {(tier.min / 1000000).toFixed(0)}tr - {maxLabel}: {tier.rate}%
+                                                        {isActive && ' ✓'}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
