@@ -9,7 +9,15 @@ Video/
 *.ps1
 appscript/
 data/
-scripts/
+scripts/check_*.ts
+scripts/clear_*.ts
+scripts/convert*.ts
+scripts/debug_*.ts
+scripts/fix_*.ts
+scripts/import_*.ts
+scripts/migrate_*.ts
+scripts/run_*.ts
+scripts/test_*.ts
 *.bak
 *.tmp
 temp_logo_base64.txt
