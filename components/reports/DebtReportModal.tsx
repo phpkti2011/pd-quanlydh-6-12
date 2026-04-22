@@ -176,6 +176,9 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 return d.getFullYear() === selectedYear;
             });
         }
+        if (selectedCustomer !== 'ALL') {
+            result = result.filter(o => o.customer_name === selectedCustomer);
+        }
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
             result = result.filter(o =>
@@ -183,8 +186,18 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 (o.order_code?.toLowerCase().includes(lowerTerm))
             );
         }
-        return result;
-    }, [settledOrders, selectedMonth, selectedYear, searchTerm]);
+        return getSortedOrders(result);
+    }, [settledOrders, selectedMonth, selectedYear, selectedCustomer, searchTerm, sortOrder]);
+
+    const settledStats = useMemo(() => {
+        const totalAmount = filteredSettled.reduce((sum: number, item: any) => sum + (parseFloat(item.total_amount) || 0), 0);
+        const uniqueCustomers = new Set(filteredSettled.map((o: any) => o.customer_name)).size;
+        return { totalAmount, uniqueCustomers, count: filteredSettled.length };
+    }, [filteredSettled]);
+
+    const uniqueSettledCustomersList = useMemo(() => {
+        return Array.from(new Set(settledOrders.map((o: any) => o.customer_name))).filter(Boolean).sort();
+    }, [settledOrders]);
 
     // Selection for settled tab
     const [selectedSettledIds, setSelectedSettledIds] = useState<Set<string>>(new Set());
@@ -404,24 +417,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     </button>
                 </div>
 
-                {activeTab === 'debt' && (<>
-                {/* Dashboard Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex flex-col justify-center items-center shadow-sm">
-                        <span className="text-red-800 font-medium text-sm uppercase tracking-wider">Tổng Công Nợ</span>
-                        <span className="text-3xl font-bold text-red-600 mt-1">{stats.totalDebt.toLocaleString('vi-VN')} đ</span>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col justify-center items-center shadow-sm">
-                        <span className="text-blue-800 font-medium text-sm uppercase tracking-wider">Số Khách Hàng Nợ</span>
-                        <span className="text-3xl font-bold text-blue-600 mt-1">{stats.uniqueCustomers}</span>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col justify-center items-center shadow-sm">
-                        <span className="text-gray-800 font-medium text-sm uppercase tracking-wider">Số Đơn Hàng</span>
-                        <span className="text-3xl font-bold text-gray-700 mt-1">{stats.count}</span>
-                    </div>
-                </div>
-
-                {/* Filters & Actions */}
+                {/* Shared Filters */}
                 <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4 bg-gray-50 p-3 rounded">
                     <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
                         <div className="relative">
@@ -443,11 +439,12 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                             value={selectedCustomer}
                             onChange={(e) => {
                                 setSelectedCustomer(e.target.value);
-                                setSelectedOrderIds(new Set()); // Reset selection when filter changes
+                                setSelectedOrderIds(new Set());
+                                setSelectedSettledIds(new Set());
                             }}
                         >
                             <option value="ALL">-- Tất cả khách hàng --</option>
-                            {uniqueCustomersList.map((cust, idx) => (
+                            {(activeTab === 'debt' ? uniqueCustomersList : uniqueSettledCustomersList).map((cust: string, idx: number) => (
                                 <option key={idx} value={cust}>{cust}</option>
                             ))}
                         </select>
@@ -460,6 +457,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                 onChange={(e) => {
                                     setSelectedMonth(Number(e.target.value));
                                     setSelectedOrderIds(new Set());
+                                    setSelectedSettledIds(new Set());
                                 }}
                             >
                                 <option value={0}>Tất cả</option>
@@ -473,6 +471,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                 onChange={(e) => {
                                     setSelectedYear(Number(e.target.value));
                                     setSelectedOrderIds(new Set());
+                                    setSelectedSettledIds(new Set());
                                 }}
                             >
                                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
@@ -482,27 +481,49 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         </div>
                     </div>
                     <div className="flex gap-2 items-center">
-                        {selectedOrderIds.size > 0 && (
-                            <button
-                                onClick={() => handleConfirmPayment()}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition shadow-sm animate-pulse font-bold"
-                            >
-                                <i className="fa-solid fa-check-double mr-2"></i>
-                                Chốt TT ({selectedOrderIds.size})
-                            </button>
-                        )}
-                        <div className="h-6 w-px bg-gray-300 mx-2 hidden md:block"></div>
                         <button onClick={fetchData} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition">
                             <i className="fa-solid fa-sync mr-1"></i> Làm mới
                         </button>
-                        <div className="flex flex-col gap-1">
-                            <button onClick={handleExportExcel} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition shadow-sm text-sm">
-                                <i className="fa-solid fa-file-excel mr-2"></i> Xuất Excel (Cơ bản)
-                            </button>
-                            <button onClick={handleExportDetailed} className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition shadow-sm text-sm">
-                                <i className="fa-solid fa-file-lines mr-2"></i> Xuất Excel (Chi tiết)
-                            </button>
-                        </div>
+                    </div>
+                </div>
+
+                {/* Tab: Công nợ */}
+                {activeTab === 'debt' && (<>
+                {/* Dashboard Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex flex-col justify-center items-center shadow-sm">
+                        <span className="text-red-800 font-medium text-sm uppercase tracking-wider">Tổng Công Nợ</span>
+                        <span className="text-3xl font-bold text-red-600 mt-1">{stats.totalDebt.toLocaleString('vi-VN')} đ</span>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col justify-center items-center shadow-sm">
+                        <span className="text-blue-800 font-medium text-sm uppercase tracking-wider">Số Khách Hàng Nợ</span>
+                        <span className="text-3xl font-bold text-blue-600 mt-1">{stats.uniqueCustomers}</span>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col justify-center items-center shadow-sm">
+                        <span className="text-gray-800 font-medium text-sm uppercase tracking-wider">Số Đơn Hàng</span>
+                        <span className="text-3xl font-bold text-gray-700 mt-1">{stats.count}</span>
+                    </div>
+                </div>
+
+                {/* Debt Actions */}
+                <div className="flex gap-2 items-center mb-4">
+                    {selectedOrderIds.size > 0 && (
+                        <button
+                            onClick={() => handleConfirmPayment()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition shadow-sm animate-pulse font-bold"
+                        >
+                            <i className="fa-solid fa-check-double mr-2"></i>
+                            Chốt TT ({selectedOrderIds.size})
+                        </button>
+                    )}
+                    <div className="flex-1"></div>
+                    <div className="flex gap-1">
+                        <button onClick={handleExportExcel} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition shadow-sm text-sm">
+                            <i className="fa-solid fa-file-excel mr-2"></i> Xuất Excel (Cơ bản)
+                        </button>
+                        <button onClick={handleExportDetailed} className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition shadow-sm text-sm">
+                            <i className="fa-solid fa-file-lines mr-2"></i> Xuất Excel (Chi tiết)
+                        </button>
                     </div>
                 </div>
 
@@ -606,6 +627,22 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 {/* Tab: Đã chốt */}
                 {activeTab === 'settled' && (
                     <>
+                    {/* Dashboard Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div className="bg-green-50 p-4 rounded-lg border border-green-100 flex flex-col justify-center items-center shadow-sm">
+                            <span className="text-green-800 font-medium text-sm uppercase tracking-wider">Tổng Đã Thu</span>
+                            <span className="text-3xl font-bold text-green-600 mt-1">{settledStats.totalAmount.toLocaleString('vi-VN')} đ</span>
+                        </div>
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col justify-center items-center shadow-sm">
+                            <span className="text-blue-800 font-medium text-sm uppercase tracking-wider">Số Khách Hàng</span>
+                            <span className="text-3xl font-bold text-blue-600 mt-1">{settledStats.uniqueCustomers}</span>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col justify-center items-center shadow-sm">
+                            <span className="text-gray-800 font-medium text-sm uppercase tracking-wider">Số Đơn Đã Chốt</span>
+                            <span className="text-3xl font-bold text-gray-700 mt-1">{settledStats.count}</span>
+                        </div>
+                    </div>
+
                     {/* Bulk undo button */}
                     {selectedSettledIds.size > 0 && (
                         <div className="mb-3 flex items-center gap-3">
