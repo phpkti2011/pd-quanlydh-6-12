@@ -145,13 +145,9 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (!confirm(confirmMsg)) return;
 
         try {
-            // Process all updates in parallel
+            // Process all updates in parallel (silent - no notifications)
             await Promise.all(targets.map(o =>
-                orderService.updateOrder(o.id, {
-                    payment_status: 'DaThanhToan',
-                    remaining_amount: 0,
-                    deposit_amount: o.total_amount
-                })
+                orderService.updatePaymentSilent(o.id, 'DaThanhToan', o.total_amount, 0)
             ));
 
             alert("Đã cập nhật trạng thái đã thanh toán!");
@@ -228,11 +224,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (!confirm(confirmMsg)) return;
         try {
             await Promise.all(targets.map(o =>
-                orderService.updateOrder(o.id, {
-                    payment_status: 'CongNo',
-                    deposit_amount: 0,
-                    remaining_amount: o.total_amount
-                })
+                orderService.updatePaymentSilent(o.id, 'CongNo', 0, o.total_amount)
             ));
             alert(`Đã hoàn tác ${targets.length} đơn về trạng thái Công Nợ.`);
             setSelectedSettledIds(new Set());

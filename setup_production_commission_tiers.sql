@@ -130,4 +130,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 5. Silent payment update (bypasses notification triggers)
+-- Used by debt management to avoid spam notifications
+CREATE OR REPLACE FUNCTION update_payment_silent(
+    p_order_id UUID,
+    p_payment_status TEXT,
+    p_deposit_amount NUMERIC,
+    p_remaining_amount NUMERIC
+) RETURNS void AS $$
+BEGIN
+    -- Disable payment notification trigger temporarily
+    ALTER TABLE orders DISABLE TRIGGER trigger_notify_payment_update;
+
+    UPDATE orders SET
+        payment_status = p_payment_status,
+        deposit_amount = p_deposit_amount,
+        remaining_amount = p_remaining_amount,
+        updated_at = NOW()
+    WHERE id = p_order_id;
+
+    -- Re-enable trigger
+    ALTER TABLE orders ENABLE TRIGGER trigger_notify_payment_update;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 NOTIFY pgrst, 'reload schema';

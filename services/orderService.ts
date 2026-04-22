@@ -379,6 +379,17 @@ export const orderService = {
         return result;
     },
 
+    // UPDATE Payment without triggering notifications (for debt management)
+    async updatePaymentSilent(orderId: string, paymentStatus: string, depositAmount: number, remainingAmount: number) {
+        const { error } = await supabase.rpc('update_payment_silent', {
+            p_order_id: orderId,
+            p_payment_status: paymentStatus,
+            p_deposit_amount: depositAmount,
+            p_remaining_amount: remainingAmount
+        });
+        if (error) throw error;
+    },
+
     // UPDATE Status
     async updateStatus(id: string, status: OrderStatus) {
         // This calls updateOrder internally, so it will log there. 
