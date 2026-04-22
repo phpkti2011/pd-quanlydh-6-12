@@ -15,7 +15,7 @@ function formatMoney(amount: number): string {
 function buildNotificationMessage(summary: any, month: number, year: number): string {
   const { total_revenue, current_tier_pct, next_tier_threshold, next_tier_pct, all_tiers } = summary;
 
-  let msg = `Doanh số hoàn thành trong tháng ${month}/${year}: ${formatMoney(total_revenue)} (chưa VAT).`;
+  let msg = `Doanh số đơn hoàn thành trong tháng ${month}/${year}: ${formatMoney(total_revenue)} (chưa VAT).`;
   msg += `\n\nMốc thưởng hiện tại: ${current_tier_pct}% hoa hồng sản xuất.`;
 
   if (current_tier_pct === 0) {
