@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
-import { AppNotification } from '../types';
+import { commissionService } from '../services/commissionService';
+import { AppNotification, ProductionTierSummary } from '../types';
 
 // Thời gian tương đối (tiếng Việt)
 function timeAgo(dateString: string): string {
@@ -38,7 +39,27 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
   const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications(userId);
   const [isOpen, setIsOpen] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [commissionSummary, setCommissionSummary] = useState<ProductionTierSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Separate pinned (system) and regular notifications
+  const { pinnedNotifs, regularNotifs } = useMemo(() => {
+    const pinned: AppNotification[] = [];
+    const regular: AppNotification[] = [];
+    // Only pin the latest system notification (commission update)
+    let foundPin = false;
+    for (const n of notifications) {
+      if (!foundPin && n.type === 'system' && n.title?.includes('Hoa Hồng')) {
+        pinned.push(n);
+        foundPin = true;
+      } else {
+        regular.push(n);
+      }
+    }
+    return { pinnedNotifs: pinned, regularNotifs: regular };
+  }, [notifications]);
 
   // Kiểm tra trạng thái push subscription thực tế
   useEffect(() => {
@@ -69,6 +90,21 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
   const handleNotifClick = async (notif: AppNotification) => {
     if (!notif.is_read) {
       await markAsRead(notif.id);
+    }
+    // System notification (commission) → open commission modal
+    if (notif.type === 'system' && notif.title?.includes('Hoa Hồng')) {
+      setLoadingSummary(true);
+      setShowCommissionModal(true);
+      setIsOpen(false);
+      try {
+        const now = new Date();
+        const summary = await commissionService.getProductionCommissionSummary(now.getMonth() + 1, now.getFullYear());
+        setCommissionSummary(summary);
+      } catch (err) {
+        console.error('Load commission summary error:', err);
+      }
+      setLoadingSummary(false);
+      return;
     }
     // Trích mã đơn hàng từ message (vd: "26PD2703.0549")
     if (onOpenOrder) {
@@ -218,7 +254,39 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
                 <span className="text-sm">Không có thông báo</span>
               </div>
             ) : (
-              notifications.map((notif) => {
+              <>
+              {/* Pinned: Commission notification */}
+              {pinnedNotifs.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => handleNotifClick(notif)}
+                  className="flex items-start gap-3 px-4 py-3 border-b-2 border-red-200 cursor-pointer transition-colors bg-red-50 hover:bg-red-100 sticky top-0 z-10"
+                >
+                  <div className="mt-0.5 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-red-100">
+                    <i className="fa-solid fa-chart-line text-xs text-red-600"></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm leading-tight font-semibold text-red-700">
+                        <i className="fa-solid fa-thumbtack mr-1 text-[10px]"></i>
+                        {notif.title}
+                      </p>
+                      {!notif.is_read && (
+                        <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-1.5"></span>
+                      )}
+                    </div>
+                    <p className="text-xs text-red-600 mt-0.5 line-clamp-3">
+                      {notif.message}
+                    </p>
+                    <p className="text-[11px] text-red-400 mt-1">
+                      {timeAgo(notif.created_at)} · <span className="underline">Xem chi tiết</span>
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {/* Regular notifications */}
+              {regularNotifs.map((notif) => {
                 const { icon, color } = getNotifIcon(notif.type);
                 return (
                   <div
@@ -228,14 +296,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
                       !notif.is_read ? 'bg-teal-50/40' : ''
                     }`}
                   >
-                    {/* Icon */}
                     <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                       !notif.is_read ? 'bg-teal-100' : 'bg-gray-100'
                     }`}>
                       <i className={`fa-solid ${icon} text-xs ${!notif.is_read ? 'text-teal-600' : color}`}></i>
                     </div>
-
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className={`text-sm leading-tight ${!notif.is_read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
@@ -245,7 +310,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
                           <span className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0 mt-1.5"></span>
                         )}
                       </div>
-                      <p className={`text-xs text-gray-500 mt-0.5 ${notif.type === 'system' ? 'whitespace-pre-line' : 'line-clamp-2'}`}>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
                         {notif.message}
                       </p>
                       <p className="text-[11px] text-gray-400 mt-1">
@@ -254,8 +319,110 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
                     </div>
                   </div>
                 );
-              })
+              })}
+              </>
             )}
+          </div>
+        </div>
+      )}
+      {/* Commission Detail Modal */}
+      {showCommissionModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50" onClick={() => setShowCommissionModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-red-600 to-orange-500 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold">Hoa Hồng Sản Xuất</h3>
+                <p className="text-sm text-red-100">Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}</p>
+              </div>
+              <button onClick={() => setShowCommissionModal(false)} className="text-white/80 hover:text-white">
+                <i className="fa-solid fa-xmark text-xl"></i>
+              </button>
+            </div>
+
+            <div className="p-6">
+              {loadingSummary ? (
+                <div className="text-center py-8 text-gray-400">
+                  <i className="fa-solid fa-spinner fa-spin text-2xl mb-2"></i>
+                  <p>Đang tải...</p>
+                </div>
+              ) : commissionSummary ? (
+                <>
+                  {/* Current Revenue */}
+                  <div className="text-center mb-6">
+                    <p className="text-sm text-gray-500 mb-1">Doanh số đơn hoàn thành trong tháng</p>
+                    <p className="text-3xl font-bold text-gray-800">
+                      {(commissionSummary.total_revenue / 1000000).toFixed(0)} triệu
+                    </p>
+                    <p className="text-xs text-gray-400">(chưa VAT)</p>
+                  </div>
+
+                  {/* Current Tier */}
+                  <div className={`text-center rounded-lg p-4 mb-6 ${
+                    commissionSummary.current_tier_pct >= 150 ? 'bg-green-50 text-green-700' :
+                    commissionSummary.current_tier_pct >= 100 ? 'bg-blue-50 text-blue-700' :
+                    commissionSummary.current_tier_pct >= 70 ? 'bg-orange-50 text-orange-700' :
+                    'bg-red-50 text-red-700'
+                  }`}>
+                    <p className="text-sm font-medium mb-1">Mốc thưởng hiện tại</p>
+                    <p className="text-4xl font-bold">×{commissionSummary.current_tier_pct}%</p>
+                    {commissionSummary.current_tier_pct === 0 && <p className="text-xs mt-1">Chưa đạt mốc thưởng</p>}
+                  </div>
+
+                  {/* Next Tier */}
+                  {commissionSummary.next_tier_threshold && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6 text-sm text-amber-800">
+                      <i className="fa-solid fa-arrow-up mr-1"></i>
+                      Mốc tiếp theo: <strong>{(commissionSummary.next_tier_threshold / 1000000).toFixed(0)} triệu</strong> → <strong>{commissionSummary.next_tier_pct}%</strong>
+                      <span className="ml-1">(còn thiếu {((commissionSummary.next_tier_threshold - commissionSummary.total_revenue) / 1000000).toFixed(0)} triệu)</span>
+                    </div>
+                  )}
+
+                  {/* All Tiers Table */}
+                  {commissionSummary.all_tiers && commissionSummary.all_tiers.length > 0 && (
+                    <div>
+                      <h4 className="font-bold text-gray-700 mb-2 text-sm">Bảng mốc thưởng hoa hồng sản xuất</h4>
+                      <table className="w-full text-sm border rounded-lg overflow-hidden">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-gray-600">Doanh số (chưa VAT)</th>
+                            <th className="px-3 py-2 text-center text-gray-600">Hệ số thưởng</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          <tr className={commissionSummary.current_tier_pct === 0 ? 'bg-red-50 font-bold' : ''}>
+                            <td className="px-3 py-2">Dưới {(Math.min(...commissionSummary.all_tiers.map((t: any) => t.min)) / 1000000).toFixed(0)} triệu</td>
+                            <td className="px-3 py-2 text-center text-red-600">0%</td>
+                          </tr>
+                          {commissionSummary.all_tiers.map((tier: any, idx: number) => {
+                            const isActive = commissionSummary.total_revenue >= tier.min && (tier.max === null || commissionSummary.total_revenue < tier.max);
+                            const maxLabel = tier.max ? `${(tier.max / 1000000).toFixed(0)} triệu` : '∞';
+                            return (
+                              <tr key={idx} className={isActive ? 'bg-orange-50 font-bold' : ''}>
+                                <td className="px-3 py-2">
+                                  {(tier.min / 1000000).toFixed(0)} - {maxLabel}
+                                  {isActive && <span className="ml-2 text-xs bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded">hiện tại</span>}
+                                </td>
+                                <td className="px-3 py-2 text-center font-bold" style={{ color: tier.rate >= 150 ? '#15803d' : tier.rate >= 100 ? '#1d4ed8' : '#c2410c' }}>
+                                  {tier.rate}%
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Formula */}
+                  <div className="mt-4 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
+                    <p className="font-bold text-gray-700 mb-1">Công thức tính thưởng:</p>
+                    <p className="font-mono">Thưởng thực nhận = (Thưởng CV chính + CV phụ) × {commissionSummary.current_tier_pct}%</p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-center py-8 text-gray-400">Không có dữ liệu</p>
+              )}
+            </div>
           </div>
         </div>
       )}
