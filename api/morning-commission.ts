@@ -95,7 +95,7 @@ export default async function handler(req: any, res: any) {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .in('role', ['NhanVienSanXuat', 'QuanLySanXuat', 'NhanVienBinhFile', 'NhanVienThietKe']);
+      .in('role', ['Admin', 'NhanVienSanXuat', 'QuanLySanXuat', 'NhanVienBinhFile', 'NhanVienThietKe']);
 
     if (profilesError) {
       console.error('Profiles error:', profilesError);
