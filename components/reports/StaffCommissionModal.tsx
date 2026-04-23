@@ -153,7 +153,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                 <h2 className="text-xl font-bold mb-4 text-purple-700 flex items-center justify-between">
                     <span>
                         <i className="fa-solid fa-gift mr-2"></i>
-                        Thưởng Nhân Viên Sản Xuất
+                        Thưởng Hoa Hồng Sản Xuất
                     </span>
                 </h2>
 
@@ -436,15 +436,15 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                         <div className="mt-6 border-t border-gray-100 pt-4 text-xs text-gray-500">
                             <h4 className="font-bold text-gray-700 mb-2 uppercase">Ghi chú tính thưởng:</h4>
                             <div className="space-y-1">
-                                <p><strong className="text-gray-900">1. Thưởng Quy Trình Chính (Bình File, In, Thành Phẩm...):</strong></p>
+                                <p><strong className="text-gray-900">1. Thưởng CV Chính (Quy Trình Sản Xuất: Bình File, In, Thành Phẩm...):</strong></p>
                                 <p className="pl-3 font-mono text-gray-600 bg-gray-50 inline-block rounded px-1 py-0.5 mb-1">
                                     (Doanh thu đơn hàng / Số người làm) × Tỉ lệ Commission (từ Cấu hình) × Điểm năng lực
                                 </p>
-                                <p><strong className="text-gray-900">2. Thưởng Công Đoạn Phụ (Thiết kế, In khổ lớn, Ép kim...):</strong></p>
+                                <p><strong className="text-gray-900">2. Thưởng CV Phụ (Dịch Vụ & Công Đoạn: Thiết kế, In khổ lớn, Ép kim...):</strong></p>
                                 <p className="pl-3 font-mono text-gray-600 bg-gray-50 inline-block rounded px-1 py-0.5">
                                     Phí dịch vụ (hoặc Doanh thu) × Tỉ lệ Commission
                                 </p>
-                                <p><strong className="text-gray-900">3. Hoa Hồng Sản Xuất (Hệ số mốc doanh số):</strong></p>
+                                <p><strong className="text-gray-900">3. Thưởng Hoa Hồng Sản Xuất (Hệ số mốc doanh số):</strong></p>
                                 <p className="pl-3 font-mono text-gray-600 bg-gray-50 inline-block rounded px-1 py-0.5 mb-1">
                                     Thưởng thực nhận = (Thưởng CV Chính + Thưởng CV Phụ) × Hệ số mốc doanh số công ty
                                 </p>

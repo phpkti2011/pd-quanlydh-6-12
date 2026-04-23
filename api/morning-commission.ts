@@ -16,7 +16,7 @@ function buildNotificationMessage(summary: any, month: number, year: number): st
   const { total_revenue, current_tier_pct, next_tier_threshold, next_tier_pct, all_tiers } = summary;
 
   let msg = `Doanh số đơn hoàn thành trong tháng ${month}/${year}: ${formatMoney(total_revenue)} (chưa VAT).`;
-  msg += `\n\nMốc thưởng hiện tại: ${current_tier_pct}% hoa hồng sản xuất.`;
+  msg += `\n\nMốc thưởng hiện tại: ${current_tier_pct}% thưởng hoa hồng sản xuất.`;
 
   if (current_tier_pct === 0) {
     msg += ` (Chưa đạt mốc thưởng)`;
@@ -112,7 +112,7 @@ export default async function handler(req: any, res: any) {
     // Insert notifications for each employee
     const notifications = profiles.map((p: any) => ({
       user_id: p.id,
-      title: 'Cập nhật Hoa Hồng Sản Xuất',
+      title: 'Cập nhật Thưởng Hoa Hồng Sản Xuất',
       message: message,
       type: 'system',
       is_read: false

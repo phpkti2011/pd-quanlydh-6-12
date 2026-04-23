@@ -331,7 +331,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-red-600 to-orange-500 text-white px-6 py-4 flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-bold">Hoa Hồng Sản Xuất</h3>
+                <h3 className="text-lg font-bold">Thưởng Hoa Hồng Sản Xuất</h3>
                 <p className="text-sm text-red-100">Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}</p>
               </div>
               <button onClick={() => setShowCommissionModal(false)} className="text-white/80 hover:text-white">

@@ -296,7 +296,7 @@ const App: React.FC = () => {
     { label: "Quản lý KH", icon: "fa-users", color: COLORS.btnCustomer, onClick: () => setIsCustomerManagerOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "BC Khách hàng", icon: "fa-chart-bar", color: "#5D4037", onClick: () => setIsCustomerReportOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "Thưởng NVKD", icon: "fa-percent", color: COLORS.btnBonusSales, onClick: () => setIsSalesCommOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
-    { label: "Thưởng NV khác", icon: "fa-gift", color: COLORS.btnBonusStaff, onClick: () => setIsStaffCommOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'NhanVienGiaoHang'] }, // Allowed for production staff to see own bonus
+    { label: "Thưởng HHSX", icon: "fa-gift", color: COLORS.btnBonusStaff, onClick: () => setIsStaffCommOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'NhanVienGiaoHang'] }, // Allowed for production staff to see own bonus
     // { label: "Xuất Toàn bộ Thưởng", icon: "fa-file-excel", color: COLORS.btnExportBonus, onClick: () => alert("Tính năng Xuất thưởng đang phát triển"), roles: ['Admin', 'KeToan'] },
     { label: "BC Hoạt động", icon: "fa-chart-pie", color: COLORS.btnActivityReport, onClick: () => setIsActivityReportOpen(true), roles: ['Admin', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'KeToan'] },
     { label: "Lịch sử HĐ", icon: "fa-history", color: "#607d8b", onClick: () => setIsActivityLogOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat'] },
