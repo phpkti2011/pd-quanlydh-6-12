@@ -245,7 +245,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
                           <span className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0 mt-1.5"></span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                      <p className={`text-xs text-gray-500 mt-0.5 ${notif.type === 'system' ? 'whitespace-pre-line' : 'line-clamp-2'}`}>
                         {notif.message}
                       </p>
                       <p className="text-[11px] text-gray-400 mt-1">
