@@ -147,7 +147,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         try {
             // Process all updates in parallel (silent - no notifications)
             await Promise.all(targets.map(o =>
-                orderService.updatePaymentSilent(o.id, 'DaThanhToan', o.total_amount, 0)
+                orderService.updatePaymentSilent(o.id, 'DaThanhToan', o.total_amount, 0, o.order_code)
             ));
 
             alert("Đã cập nhật trạng thái đã thanh toán!");
@@ -224,7 +224,7 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (!confirm(confirmMsg)) return;
         try {
             await Promise.all(targets.map(o =>
-                orderService.updatePaymentSilent(o.id, 'CongNo', 0, o.total_amount)
+                orderService.updatePaymentSilent(o.id, 'CongNo', 0, o.total_amount, o.order_code)
             ));
             alert(`Đã hoàn tác ${targets.length} đơn về trạng thái Công Nợ.`);
             setSelectedSettledIds(new Set());

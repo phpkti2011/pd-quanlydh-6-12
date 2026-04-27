@@ -380,7 +380,7 @@ export const orderService = {
     },
 
     // UPDATE Payment without triggering notifications (for debt management)
-    async updatePaymentSilent(orderId: string, paymentStatus: string, depositAmount: number, remainingAmount: number) {
+    async updatePaymentSilent(orderId: string, paymentStatus: string, depositAmount: number, remainingAmount: number, orderCode?: string) {
         const { error } = await supabase.rpc('update_payment_silent', {
             p_order_id: orderId,
             p_payment_status: paymentStatus,
@@ -388,6 +388,20 @@ export const orderService = {
             p_remaining_amount: remainingAmount
         });
         if (error) throw error;
+
+        let code = orderCode;
+        if (!code) {
+            const { data: order } = await supabase.from('orders').select('order_code').eq('id', orderId).single();
+            code = order?.order_code || orderId;
+        }
+        const actionType = paymentStatus === 'DaThanhToan' ? 'PAYMENT_SETTLED'
+            : paymentStatus === 'CongNo' ? 'PAYMENT_UNDONE'
+            : 'PAYMENT_UPDATE';
+        await logService.logActivity(actionType, 'order', code, {
+            payment_status: paymentStatus,
+            deposit_amount: depositAmount,
+            remaining_amount: remainingAmount
+        });
     },
 
     // UPDATE Status
