@@ -1,7 +1,7 @@
 -- =====================================================
 -- Sync Details Function: Cập nhật get_staff_activity_details
--- Để khớp logic với calculate_staff_commission mới:
--- 1. Main Task (Quy trình): Chia 1000
+-- Để khớp logic với calculate_staff_commission:
+-- 1. Main Task (Quy trình): Chia 100
 -- 2. Sub Task (Công đoạn): Chia 100
 -- 3. Tham số TEXT
 -- =====================================================
@@ -114,11 +114,11 @@ BEGIN
             pt.score,
             pt.participant_count,
             
-            -- Process Commission: DIVIDE BY 1000
-            CASE 
-                WHEN pt.stage_value = 0 THEN 
-                    (pt.total_amount_pre_vat / pt.participant_count) * (pt.process_rate / 1000.0) * pt.score 
-                ELSE 0 
+            -- Process Commission: DIVIDE BY 100 (khớp calculate_staff_commission)
+            CASE
+                WHEN pt.stage_value = 0 THEN
+                    (pt.total_amount_pre_vat / pt.participant_count) * (pt.process_rate / 100.0) * pt.score
+                ELSE 0
             END as process_comm_val,
             
             -- Sub-task Commission: DIVIDE BY 100
