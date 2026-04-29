@@ -21,14 +21,14 @@ REFERENCES profiles(id)
 ON DELETE SET NULL;
 
 -- Audit Logs: PERFORMED_BY -> Set Null (Keep the history, remove the actor link)
-ALTER TABLE audit_logs
-DROP CONSTRAINT IF EXISTS audit_logs_performed_by_fkey;
-
-ALTER TABLE audit_logs
-ADD CONSTRAINT audit_logs_performed_by_fkey
-FOREIGN KEY (performed_by)
-REFERENCES profiles(id)
-ON DELETE SET NULL;
+-- Skip if table doesn't exist (DB này dùng user_logs thay vì audit_logs)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'audit_logs') THEN
+        EXECUTE 'ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_performed_by_fkey';
+        EXECUTE 'ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_performed_by_fkey FOREIGN KEY (performed_by) REFERENCES profiles(id) ON DELETE SET NULL';
+    END IF;
+END $$;
 
 -- Order Process Participants -> CASCADE (Remove the work participation record)
 ALTER TABLE order_process_participants
