@@ -90,6 +90,7 @@ BEGIN
              AND o.completed_at::DATE >= p_start_date
              AND o.completed_at::DATE <= p_end_date)
         )
+        AND p.role != 'NhanVienKinhDoanh'
     ),
     
     staff_calc AS (

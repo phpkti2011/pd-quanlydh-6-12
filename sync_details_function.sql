@@ -101,7 +101,7 @@ BEGIN
              AND o.completed_at::DATE >= v_start
              AND o.completed_at::DATE <= v_end)
         )
-        -- AND p.role != 'NhanVienKinhDoanh' -- Optional: details might want to show everyone, but for consistency let's leave it open or match summary. user_name filter is used anyway.
+        AND p.role != 'NhanVienKinhDoanh'
     ),
     
     staff_details AS (
