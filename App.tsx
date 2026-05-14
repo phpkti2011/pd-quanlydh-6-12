@@ -24,6 +24,7 @@ import ActivityReportModal from './components/reports/ActivityReportModal';
 import PerformanceStatsModal from './components/reports/PerformanceStatsModal';
 import SalesEvaluationModal from './components/reports/SalesEvaluationModal';
 import DebtReportModal from './components/reports/DebtReportModal';
+import DailyReportModal from './components/reports/DailyReportModal';
 import VersionManager from './components/VersionManager';
 import CollectionReportModal from './components/reports/CollectionReportModal';
 import ActivityLogModal from './components/reports/ActivityLogModal';
@@ -74,6 +75,7 @@ const App: React.FC = () => {
   const [isPerformanceStatsOpen, setIsPerformanceStatsOpen] = useState(false);
   const [isSalesEvalOpen, setIsSalesEvalOpen] = useState(false);
   const [isDebtReportOpen, setIsDebtReportOpen] = useState(false);
+  const [isDailyReportOpen, setIsDailyReportOpen] = useState(false);
   const [isCollectionReportOpen, setIsCollectionReportOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [isCustomerReportOpen, setIsCustomerReportOpen] = useState(false);
@@ -295,6 +297,7 @@ const App: React.FC = () => {
     { label: "Nhập đơn mới", icon: "fa-plus", color: COLORS.btnNewOrder, onClick: handleCreateOrder, roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "Quản lý KH", icon: "fa-users", color: COLORS.btnCustomer, onClick: () => setIsCustomerManagerOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "BC Khách hàng", icon: "fa-chart-bar", color: "#5D4037", onClick: () => setIsCustomerReportOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
+    { label: "Báo cáo ngày", icon: "fa-chart-line", color: "#1d4ed8", onClick: () => setIsDailyReportOpen(true), roles: ['Admin', 'KeToan'] },
     { label: "Thưởng NVKD", icon: "fa-percent", color: COLORS.btnBonusSales, onClick: () => setIsSalesCommOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "Thưởng HHSX", icon: "fa-gift", color: COLORS.btnBonusStaff, onClick: () => setIsStaffCommOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'NhanVienGiaoHang'] }, // Allowed for production staff to see own bonus
     // { label: "Xuất Toàn bộ Thưởng", icon: "fa-file-excel", color: COLORS.btnExportBonus, onClick: () => alert("Tính năng Xuất thưởng đang phát triển"), roles: ['Admin', 'KeToan'] },
@@ -929,6 +932,10 @@ const App: React.FC = () => {
       <DebtReportModal
         isOpen={isDebtReportOpen}
         onClose={() => setIsDebtReportOpen(false)}
+      />
+      <DailyReportModal
+        isOpen={isDailyReportOpen}
+        onClose={() => setIsDailyReportOpen(false)}
       />
       <CollectionReportModal
         isOpen={isCollectionReportOpen}
