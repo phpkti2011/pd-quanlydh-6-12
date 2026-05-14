@@ -26,7 +26,7 @@ function formatMoney(amount: number): string {
   return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
 }
 
-function formatReport(data: any): string {
+function formatReport(data: any, debugMarker?: string): string {
   const d = data;
   const date = new Date(d.report_date).toLocaleDateString('vi-VN');
 
@@ -89,6 +89,9 @@ function formatReport(data: any): string {
 
   msg += `━━━━━━━━━━━━━━━━━━━\n`;
   msg += `🤖 _P&D Order Manager_`;
+  if (debugMarker) {
+    msg += `\n${debugMarker}`;
+  }
 
   return msg;
 }
@@ -144,8 +147,17 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: 'Database error', details: error.message });
     }
 
+    // Debug marker: ID ngẫu nhiên + thời gian UTC + nguồn gọi
+    // Mục đích: phân biệt khi nhận trùng tin -> biết là 1 invocation gửi đôi hay 2 invocation
+    const invId = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const utcNow = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const isVercelCron = !!req.headers['x-vercel-cron'];
+    const userAgent = (req.headers['user-agent'] || '').toString().slice(0, 40);
+    const source = isVercelCron ? 'vercel-cron' : `other (UA: ${userAgent || 'none'})`;
+    const debugMarker = `\`[${invId}] ${utcNow} UTC | ${source}\``;
+
     // Format và gửi Telegram
-    const message = formatReport(data);
+    const message = formatReport(data, debugMarker);
     const sent = await sendTelegram(message);
 
     if (!sent) {
