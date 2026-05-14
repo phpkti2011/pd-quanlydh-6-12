@@ -93,13 +93,16 @@ const DailyReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
         setLoading(true);
         setError(null);
         try {
-            const [report, trendData] = await Promise.all([
-                dailyReportService.getDailyReport(date),
-                dailyReportService.getRevenueTrend(7, date),
-            ]);
+            const report = await dailyReportService.getDailyReport(date);
             setData(report);
-            setTrend(trendData);
             setLoadedAt(new Date().toLocaleTimeString('vi-VN'));
+            try {
+                const trendData = await dailyReportService.getRevenueTrend(7, date);
+                setTrend(trendData);
+            } catch (trendErr: any) {
+                console.warn('Revenue trend not available:', trendErr.message);
+                setTrend([]);
+            }
         } catch (e: any) {
             console.error(e);
             setError(e.message || 'Lỗi tải báo cáo');
