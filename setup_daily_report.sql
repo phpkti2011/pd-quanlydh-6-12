@@ -11,9 +11,13 @@ DECLARE
     v_result JSON;
     v_start TIMESTAMPTZ;
     v_end TIMESTAMPTZ;
+    v_month_start TIMESTAMPTZ;
+    v_month_end TIMESTAMPTZ;
 BEGIN
     v_start := p_date::timestamptz;
     v_end := (p_date + 1)::timestamptz;
+    v_month_start := date_trunc('month', p_date)::timestamptz;
+    v_month_end := (date_trunc('month', p_date) + interval '1 month')::timestamptz;
 
     SELECT json_build_object(
         'report_date', p_date,
@@ -39,13 +43,28 @@ BEGIN
             WHERE created_at >= v_start AND created_at < v_end
             AND status::text NOT IN ('Huy')
         ),
+        'revenue_today_pre_vat', (
+            SELECT COALESCE(SUM(total_amount_pre_vat), 0) FROM orders
+            WHERE created_at >= v_start AND created_at < v_end
+            AND status::text NOT IN ('Huy')
+        ),
         'revenue_completed_today', (
-            SELECT COALESCE(SUM(total_amount), 0) FROM orders
+            SELECT COALESCE(SUM(total_amount_pre_vat), 0) FROM orders
             WHERE status::text = 'HoanThanh'
             AND CASE
                 WHEN completed_at IS NOT NULL THEN completed_at >= v_start AND completed_at < v_end
                 ELSE updated_at >= v_start AND updated_at < v_end
             END
+        ),
+        'revenue_month_total', (
+            SELECT COALESCE(SUM(total_amount), 0) FROM orders
+            WHERE created_at >= v_month_start AND created_at < v_month_end
+            AND status::text NOT IN ('Huy')
+        ),
+        'revenue_month_pre_vat', (
+            SELECT COALESCE(SUM(total_amount_pre_vat), 0) FROM orders
+            WHERE created_at >= v_month_start AND created_at < v_month_end
+            AND status::text NOT IN ('Huy')
         ),
         'sales_by_employee', (
             SELECT COALESCE(json_agg(emp_stats ORDER BY emp_stats.revenue DESC), '[]'::json)

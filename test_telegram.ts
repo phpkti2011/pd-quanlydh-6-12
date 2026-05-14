@@ -36,8 +36,11 @@ function formatReport(data: any): string {
   msg += `• Đơn đang xử lý: *${d.pending_orders_count}*\n\n`;
 
   msg += `💰 *DOANH THU*\n`;
-  msg += `• Doanh thu đơn mới: *${formatMoney(d.revenue_today)}*\n`;
-  msg += `• Doanh thu hoàn thành: *${formatMoney(d.revenue_completed_today)}*\n\n`;
+  msg += `• Doanh thu đơn mới (chưa VAT): *${formatMoney(d.revenue_today_pre_vat || 0)}*\n`;
+  msg += `• Doanh thu đơn mới (có VAT): *${formatMoney(d.revenue_today)}*\n`;
+  msg += `• Doanh thu hoàn thành (chưa VAT): *${formatMoney(d.revenue_completed_today)}*\n`;
+  msg += `• Doanh thu tháng (có VAT): *${formatMoney(d.revenue_month_total || 0)}*\n`;
+  msg += `• Doanh thu tháng (chưa VAT): *${formatMoney(d.revenue_month_pre_vat || 0)}*\n\n`;
 
   const ps = d.payment_stats;
   msg += `🏦 *THANH TOÁN*\n`;
