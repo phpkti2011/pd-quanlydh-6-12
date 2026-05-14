@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Vercel Serverless Function - Gửi báo cáo hàng ngày qua Telegram
-// Triggered by Vercel Cron at 22:00 daily (UTC+7 = 15:00 UTC)
+// Triggered by Vercel Cron 3 lần/ngày (Thứ 2 - Thứ 7, trừ chủ nhật):
+//   12:10 VN (05:10 UTC) - 17:40 VN (10:40 UTC) - 20:00 VN (13:00 UTC)
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';

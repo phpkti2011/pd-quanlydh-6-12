@@ -28,7 +28,15 @@
     "crons": [
         {
             "path": "/api/daily-report",
-            "schedule": "0 13 * * *"
+            "schedule": "10 5 * * 1-6"
+        },
+        {
+            "path": "/api/daily-report",
+            "schedule": "40 10 * * 1-6"
+        },
+        {
+            "path": "/api/daily-report",
+            "schedule": "0 13 * * 1-6"
         },
         {
             "path": "/api/morning-commission",
