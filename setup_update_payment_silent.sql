@@ -27,7 +27,7 @@ BEGIN
     END;
 
     UPDATE orders SET
-        payment_status = p_payment_status,
+        payment_status = p_payment_status::payment_status,
         deposit_amount = p_deposit_amount,
         remaining_amount = p_remaining_amount,
         updated_at = NOW()
