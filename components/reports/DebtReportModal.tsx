@@ -144,18 +144,25 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
         if (!confirm(confirmMsg)) return;
 
-        try {
-            // Process all updates in parallel (silent - no notifications)
-            await Promise.all(targets.map(o =>
-                orderService.updatePaymentSilent(o.id, 'DaThanhToan', o.total_amount, 0, o.order_code)
-            ));
-
-            alert("Đã cập nhật trạng thái đã thanh toán!");
-            fetchData();
-        } catch (err) {
-            console.error(err);
-            alert("Lỗi cập nhật đơn hàng");
+        // Chạy tuần tự để tránh tranh chấp khoá ALTER TABLE trong RPC update_payment_silent
+        const failed: { code: string; err: string }[] = [];
+        for (const o of targets) {
+            try {
+                await orderService.updatePaymentSilent(o.id, 'DaThanhToan', o.total_amount, 0, o.order_code);
+            } catch (e: any) {
+                failed.push({ code: o.order_code, err: e?.message || String(e) });
+            }
         }
+
+        const okCount = targets.length - failed.length;
+        if (failed.length === 0) {
+            alert(`Đã chốt thanh toán ${okCount} đơn.`);
+        } else if (okCount > 0) {
+            alert(`Chốt OK ${okCount}/${targets.length} đơn.\nLỗi (${failed.length}):\n${failed.slice(0, 3).map(f => `• ${f.code}: ${f.err}`).join('\n')}`);
+        } else {
+            alert(`Tất cả ${targets.length} đơn đều lỗi.\nMẫu lỗi: ${failed[0].code}: ${failed[0].err}`);
+        }
+        fetchData();
     };
 
     // Filtered settled orders by month/year
@@ -222,17 +229,26 @@ const DebtReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
             : `Hoàn tác ${targets.length} đơn đã chọn về trạng thái Công Nợ?`;
 
         if (!confirm(confirmMsg)) return;
-        try {
-            await Promise.all(targets.map(o =>
-                orderService.updatePaymentSilent(o.id, 'CongNo', 0, o.total_amount, o.order_code)
-            ));
-            alert(`Đã hoàn tác ${targets.length} đơn về trạng thái Công Nợ.`);
-            setSelectedSettledIds(new Set());
-            fetchData();
-        } catch (err) {
-            console.error(err);
-            alert("Lỗi hoàn tác");
+
+        const failed: { code: string; err: string }[] = [];
+        for (const o of targets) {
+            try {
+                await orderService.updatePaymentSilent(o.id, 'CongNo', 0, o.total_amount, o.order_code);
+            } catch (e: any) {
+                failed.push({ code: o.order_code, err: e?.message || String(e) });
+            }
         }
+
+        const okCount = targets.length - failed.length;
+        if (failed.length === 0) {
+            alert(`Đã hoàn tác ${okCount} đơn về trạng thái Công Nợ.`);
+        } else if (okCount > 0) {
+            alert(`Hoàn tác OK ${okCount}/${targets.length} đơn.\nLỗi (${failed.length}):\n${failed.slice(0, 3).map(f => `• ${f.code}: ${f.err}`).join('\n')}`);
+        } else {
+            alert(`Tất cả ${targets.length} đơn đều lỗi.\nMẫu lỗi: ${failed[0].code}: ${failed[0].err}`);
+        }
+        setSelectedSettledIds(new Set());
+        fetchData();
     };
 
     const handleExportDetailed = async () => {
