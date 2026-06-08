@@ -167,17 +167,32 @@ export const commissionService = {
     },
 
     /**
-     * Get Production Commission Tiers
+     * Get Production Commission Tiers cho 1 tháng cụ thể.
+     * Nếu tháng đó chưa cấu hình riêng -> fallback về mốc global (period_month IS NULL).
      */
-    async getProductionTiers(): Promise<CommissionPolicy[]> {
-        const { data, error } = await supabase
+    async getProductionTiers(month: number, year: number): Promise<CommissionPolicy[]> {
+        // 1. Ưu tiên mốc riêng của tháng
+        const { data: monthData, error: monthErr } = await supabase
             .from('commission_policies')
             .select('*')
             .eq('policy_type', 'PRODUCTION_TIER')
+            .eq('period_month', month)
+            .eq('period_year', year)
             .order('threshold_min', { ascending: true });
 
-        if (error) throw error;
-        return data as CommissionPolicy[];
+        if (monthErr) throw monthErr;
+        if (monthData && monthData.length > 0) return monthData as CommissionPolicy[];
+
+        // 2. Fallback: mốc global (chưa gắn tháng)
+        const { data: globalData, error: globalErr } = await supabase
+            .from('commission_policies')
+            .select('*')
+            .eq('policy_type', 'PRODUCTION_TIER')
+            .is('period_month', null)
+            .order('threshold_min', { ascending: true });
+
+        if (globalErr) throw globalErr;
+        return (globalData || []) as CommissionPolicy[];
     },
 
     /**
@@ -186,14 +201,20 @@ export const commissionService = {
     /**
      * Save all production tiers at once via RPC (bypasses RLS)
      */
-    async saveProductionTiers(tiers: { threshold_min: number; threshold_max: number | null; rate: number }[]) {
+    async saveProductionTiers(
+        tiers: { threshold_min: number; threshold_max: number | null; rate: number }[],
+        month: number,
+        year: number
+    ) {
         const payload = tiers.map(t => ({
             min: t.threshold_min,
             max: t.threshold_max,
             rate: t.rate
         }));
         const { error } = await supabase.rpc('save_production_tiers', {
-            p_tiers: JSON.stringify(payload)
+            p_tiers: JSON.stringify(payload),
+            p_month: month,
+            p_year: year
         });
         if (error) throw error;
     },

@@ -55,8 +55,12 @@ BEGIN
          AND completed_at::DATE <= v_end)
     );
 
-    -- Get production tier rate
-    v_tier_pct := get_production_tier_rate(v_total_month_sales);
+    -- Get production tier rate (theo mốc của đúng tháng, fallback global)
+    v_tier_pct := get_production_tier_rate(
+        v_total_month_sales,
+        EXTRACT(MONTH FROM v_start)::INT,
+        EXTRACT(YEAR FROM v_start)::INT
+    );
 
     RETURN QUERY
     -- 1. Regular Staff Commission Details

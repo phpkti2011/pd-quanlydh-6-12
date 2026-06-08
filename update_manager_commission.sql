@@ -45,8 +45,12 @@ BEGIN
          AND completed_at::DATE <= p_end_date)
     );
 
-    -- Get production tier rate based on total month sales
-    v_tier_pct := get_production_tier_rate(v_total_month_sales);
+    -- Get production tier rate based on total month sales (theo mốc của đúng tháng, fallback global)
+    v_tier_pct := get_production_tier_rate(
+        v_total_month_sales,
+        EXTRACT(MONTH FROM p_start_date)::INT,
+        EXTRACT(YEAR FROM p_start_date)::INT
+    );
 
     RETURN QUERY
     -- 1. Normal Staff Commission (Existing Logic)

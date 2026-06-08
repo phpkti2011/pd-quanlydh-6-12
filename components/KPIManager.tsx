@@ -29,6 +29,9 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
     const [configuringEmployee, setConfiguringEmployee] = useState<Profile | null>(null);
     const [showConfigModal, setShowConfigModal] = useState(false);
 
+    // Trigger "Lấy từ tháng trước" cho tab Sản xuất (ProductionTierTab tự xử lý)
+    const [productionCopyTrigger, setProductionCopyTrigger] = useState(0);
+
     // Load Data
     useEffect(() => {
         if (isOpen) {
@@ -142,6 +145,12 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
 
     const handleCopyFromPreviousMonth = async () => {
         if (!confirm(`Bạn có chắc muốn sao chép cấu hình KPI từ tháng trước (Tháng ${selectedMonth === 1 ? 12 : selectedMonth - 1}/${selectedMonth === 1 ? selectedYear - 1 : selectedYear}) sang tháng hiện tại không? Dữ liệu hiện tại sẽ bị ghi đè.`)) {
+            return;
+        }
+
+        // Tab Sản xuất: để ProductionTierTab tự nạp mốc tháng trước
+        if (activeTab === 'production') {
+            setProductionCopyTrigger(prev => prev + 1);
             return;
         }
 
@@ -289,7 +298,7 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
                 {/* Content */}
                 <div className="flex-1 overflow-auto p-6">
                     {activeTab === 'production' ? (
-                        <ProductionTierTab month={selectedMonth} year={selectedYear} />
+                        <ProductionTierTab month={selectedMonth} year={selectedYear} copyTrigger={productionCopyTrigger} />
                     ) : activeTab === 'employees' ? (
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-600 border-b">
@@ -430,7 +439,7 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
 };
 
 // Production Tier Configuration Tab
-const ProductionTierTab: React.FC<{ month: number; year: number }> = ({ month, year }) => {
+const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: number }> = ({ month, year, copyTrigger }) => {
     const [tiers, setTiers] = useState<CommissionPolicy[]>([]);
     const [summary, setSummary] = useState<ProductionTierSummary | null>(null);
     const [loading, setLoading] = useState(false);
@@ -441,11 +450,41 @@ const ProductionTierTab: React.FC<{ month: number; year: number }> = ({ month, y
         loadData();
     }, [month, year]);
 
+    // "Lấy từ tháng trước" cho tab Sản xuất: nạp mốc tháng trước vào editor (chưa lưu)
+    useEffect(() => {
+        if (!copyTrigger) return;
+        copyFromPreviousMonth();
+    }, [copyTrigger]);
+
+    const copyFromPreviousMonth = async () => {
+        const prevMonth = month === 1 ? 12 : month - 1;
+        const prevYear = month === 1 ? year - 1 : year;
+        setLoading(true);
+        try {
+            const prevTiers = await commissionService.getProductionTiers(prevMonth, prevYear);
+            if (prevTiers.length > 0) {
+                setEditTiers(prevTiers.map(t => ({
+                    id: null,
+                    threshold_min: t.threshold_min || 0,
+                    threshold_max: t.threshold_max || null,
+                    rate: t.rate
+                })));
+                alert(`Đã nạp ${prevTiers.length} mốc từ tháng ${prevMonth}/${prevYear}. Vui lòng kiểm tra và nhấn "Lưu Mốc Thưởng Sản Xuất" để áp dụng cho tháng ${month}/${year}.`);
+            } else {
+                alert(`Không tìm thấy mốc thưởng sản xuất của tháng ${prevMonth}/${prevYear}.`);
+            }
+        } catch (err: any) {
+            console.error('Copy production tiers error:', err);
+            alert('Lỗi sao chép: ' + err.message);
+        }
+        setLoading(false);
+    };
+
     const loadData = async () => {
         setLoading(true);
         try {
             const [tiersData, summaryData] = await Promise.all([
-                commissionService.getProductionTiers(),
+                commissionService.getProductionTiers(month, year),
                 commissionService.getProductionCommissionSummary(month, year)
             ]);
             setTiers(tiersData);
@@ -487,7 +526,9 @@ const ProductionTierTab: React.FC<{ month: number; year: number }> = ({ month, y
                     threshold_min: t.threshold_min || 0,
                     threshold_max: t.threshold_max,
                     rate: t.rate || 0
-                }))
+                })),
+                month,
+                year
             );
             alert('Đã lưu cấu hình mốc thưởng sản xuất!');
             await loadData();

@@ -1,3 +1,1 @@
-export const APP_VERSION = {
-    "timestamp": 0
-};
+export const APP_VERSION = {"timestamp":1780888362244};
