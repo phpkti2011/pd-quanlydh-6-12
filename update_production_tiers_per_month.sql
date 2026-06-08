@@ -36,12 +36,14 @@ BEGIN
       AND period_month = p_month
       AND period_year  = p_year;
 
-    -- Chèn mốc mới, gắn tháng/năm
+    -- Chèn mốc mới, gắn tháng/năm.
+    -- apply_to phải mang theo năm/tháng để KHÔNG đụng UNIQUE(policy_type, apply_to)
+    -- với mốc global cũ (TIER_1..n) hoặc mốc tháng khác.
     INSERT INTO commission_policies (id, policy_type, apply_to, threshold_min, threshold_max, rate, period_month, period_year)
     SELECT
         uuid_generate_v4(),
         'PRODUCTION_TIER',
-        'TIER_' || row_number() OVER (ORDER BY (elem->>'min')::NUMERIC),
+        'TIER_' || p_year || '_' || p_month || '_' || row_number() OVER (ORDER BY (elem->>'min')::NUMERIC),
         (elem->>'min')::NUMERIC,
         CASE WHEN elem->>'max' = '' OR elem->>'max' IS NULL THEN NULL ELSE (elem->>'max')::NUMERIC END,
         (elem->>'rate')::NUMERIC,
