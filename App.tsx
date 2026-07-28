@@ -29,6 +29,7 @@ import VersionManager from './components/VersionManager';
 import CollectionReportModal from './components/reports/CollectionReportModal';
 import ActivityLogModal from './components/reports/ActivityLogModal';
 import CustomerReportModal from './components/reports/CustomerReportModal';
+import CustomerRevenueModal from './components/reports/CustomerRevenueModal';
 import TrackingPage from './components/TrackingPage';
 
 import { AISettingsModal } from './components/AISettingsModal';
@@ -79,6 +80,7 @@ const App: React.FC = () => {
   const [isCollectionReportOpen, setIsCollectionReportOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [isCustomerReportOpen, setIsCustomerReportOpen] = useState(false);
+  const [isCustomerRevenueOpen, setIsCustomerRevenueOpen] = useState(false);
 
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false); // Mobile Action Menu Toggle
 
@@ -297,6 +299,7 @@ const App: React.FC = () => {
     { label: "Nhập đơn mới", icon: "fa-plus", color: COLORS.btnNewOrder, onClick: handleCreateOrder, roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "Quản lý KH", icon: "fa-users", color: COLORS.btnCustomer, onClick: () => setIsCustomerManagerOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "BC Khách hàng", icon: "fa-chart-bar", color: "#5D4037", onClick: () => setIsCustomerReportOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
+    { label: "DT theo KH", icon: "fa-coins", color: "#00695C", onClick: () => setIsCustomerRevenueOpen(true), roles: ['Admin', 'KeToan', 'NhanVienKinhDoanh'] },
     { label: "Báo cáo ngày", icon: "fa-chart-line", color: "#1d4ed8", onClick: () => setIsDailyReportOpen(true), roles: ['Admin', 'KeToan'] },
     { label: "Thưởng NVKD", icon: "fa-percent", color: COLORS.btnBonusSales, onClick: () => setIsSalesCommOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
     { label: "Thưởng HHSX", icon: "fa-gift", color: COLORS.btnBonusStaff, onClick: () => setIsStaffCommOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'NhanVienGiaoHang'] }, // Allowed for production staff to see own bonus
@@ -945,6 +948,11 @@ const App: React.FC = () => {
       <CustomerReportModal
         isOpen={isCustomerReportOpen}
         onClose={() => setIsCustomerReportOpen(false)}
+      />
+
+      <CustomerRevenueModal
+        isOpen={isCustomerRevenueOpen}
+        onClose={() => setIsCustomerRevenueOpen(false)}
       />
 
       <AISettingsModal

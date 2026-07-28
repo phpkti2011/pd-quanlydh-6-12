@@ -31,6 +31,12 @@ export const formatDateTime = (dateString?: string | null): string => {
     }
 };
 
+// Mốc đầu/cuối của một tháng (month: 1-12) — dùng cho các bộ lọc theo tháng
+export const getMonthRange = (month: number, year: number): { start: Date; end: Date } => ({
+    start: new Date(year, month - 1, 1),
+    end: new Date(year, month, 0, 23, 59, 59, 999),
+});
+
 export const toVietnamTime = (date: Date): Date => {
     // Helper if we need to shift a Date object logic-wise, 
     // but usually string formatting is enough for display.
