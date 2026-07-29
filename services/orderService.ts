@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient';
 import { Order, OrderStatus } from '../types';
-import { logService } from './logService'; // Import Log Service
 
 export const orderService = {
 
@@ -276,9 +275,8 @@ export const orderService = {
 
         if (error) throw error;
 
-        // Log Activity
-        // Fixed: Use correct property name 'order_code'
-        await logService.logActivity('ORDER_CREATE', 'order', data.order_code || data.id, { id: data.id });
+        // Nhật ký ORDER_CREATE do trigger trg_audit_orders ghi (setup_audit_trail.sql),
+        // kèm toàn bộ nội dung đơn lúc tạo.
 
         return data;
     },
@@ -322,11 +320,9 @@ export const orderService = {
 
         if (error) throw error;
 
-        // Log Activity: Determine what changed for cleaner logs (optional simplification)
-        const code = result.order_code || id;
-
         if (payload.status) {
-            await logService.logActivity('ORDER_UPDATE_STATUS', 'order', code, { old_status: currentOrder.status, new_status: payload.status });
+            // Nhật ký do trigger trg_audit_orders ghi — nó so sánh OLD/NEW nên
+            // ghi được ĐỦ mọi trường đổi trong cùng lần lưu, không chỉ trạng thái.
 
             // AUTO-COMMISSION LOGIC
             // Rules:
@@ -369,18 +365,14 @@ export const orderService = {
                 }
             }
 
-        } else if (payload.deposit_amount !== undefined || payload.remaining_amount !== undefined) {
-            await logService.logActivity('PAYMENT_UPDATE', 'order', code, { payload });
-        } else {
-            // Log the actual changes (payload) to show what content was updated
-            await logService.logActivity('ORDER_UPDATE_INFO', 'order', code, { changes: payload });
         }
 
         return result;
     },
 
     // UPDATE Payment without triggering notifications (for debt management)
-    async updatePaymentSilent(orderId: string, paymentStatus: string, depositAmount: number, remainingAmount: number, orderCode?: string) {
+    // _orderCode: giữ lại cho tương thích với chỗ gọi, không còn dùng vì trigger tự tra mã đơn
+    async updatePaymentSilent(orderId: string, paymentStatus: string, depositAmount: number, remainingAmount: number, _orderCode?: string) {
         const { error } = await supabase.rpc('update_payment_silent', {
             p_order_id: orderId,
             p_payment_status: paymentStatus,
@@ -389,19 +381,8 @@ export const orderService = {
         });
         if (error) throw error;
 
-        let code = orderCode;
-        if (!code) {
-            const { data: order } = await supabase.from('orders').select('order_code').eq('id', orderId).single();
-            code = order?.order_code || orderId;
-        }
-        const actionType = paymentStatus === 'DaThanhToan' ? 'PAYMENT_SETTLED'
-            : paymentStatus === 'CongNo' ? 'PAYMENT_UNDONE'
-            : 'PAYMENT_UPDATE';
-        await logService.logActivity(actionType, 'order', code, {
-            payment_status: paymentStatus,
-            deposit_amount: depositAmount,
-            remaining_amount: remainingAmount
-        });
+        // Nhật ký PAYMENT_UPDATE do trigger trg_audit_orders ghi. Trước đây RPC này
+        // là đường đi "không để lại vết" nếu người dùng gọi thẳng — giờ thì không.
     },
 
     // UPDATE Status
@@ -439,22 +420,13 @@ export const orderService = {
 
         if (error) throw error;
 
-        // Log Join Activity
-        const orderCode = data.order?.order_code || orderId; // Fallback
-        await logService.logActivity('STAGE_JOIN', 'order', orderCode, { stage: stage });
+        // Nhật ký STAGE_JOIN do trigger trg_audit_stage_participants ghi.
 
         return data;
     },
 
     // LEAVE Stage (Undo Join)
     async leaveStage(orderId: string, stage: string, userId: string) {
-        // We need order code for logging, so fetch it first or rely on client?
-        // Let's fetch quickly or just look it up.
-        // Actually, we can just log with ID if strictly needed, but let's try to consistant.
-        // For efficiency, maybe just fetch code.
-        const { data: order } = await supabase.from('orders').select('order_code').eq('id', orderId).single();
-        const code = order?.order_code || orderId;
-
         const { error } = await supabase
             .from('order_process_participants')
             .delete()
@@ -462,8 +434,7 @@ export const orderService = {
 
         if (error) throw error;
 
-        // Log Leave/Undo Activity
-        await logService.logActivity('STAGE_LEAVE', 'order', code, { stage: stage });
+        // Nhật ký STAGE_LEAVE do trigger trg_audit_stage_participants ghi.
     },
 
     // FINANCE REPORTS

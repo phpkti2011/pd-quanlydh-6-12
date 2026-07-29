@@ -21,6 +21,16 @@ export const authService = {
         });
 
         if (error) throw error;
+
+        // Ghi nhật ký đăng nhập. Import động vì logService đã import file này
+        // (import tĩnh hai chiều sẽ tạo vòng lặp phụ thuộc).
+        try {
+            const { logService } = await import('./logService');
+            await logService.logActivity('LOGIN', 'system', email, {});
+        } catch (e) {
+            console.error('Không ghi được nhật ký đăng nhập:', e);
+        }
+
         return data;
     },
 
@@ -29,6 +39,18 @@ export const authService = {
      */
     signOut: async () => {
         if (!supabase) return;
+
+        // Ghi log TRƯỚC khi huỷ session, nếu không sẽ không còn ai để ghi tên
+        try {
+            const { data } = await supabase.auth.getSession();
+            if (data.session?.user) {
+                const { logService } = await import('./logService');
+                await logService.logActivity('LOGOUT', 'system', data.session.user.email || '', {});
+            }
+        } catch (e) {
+            console.error('Không ghi được nhật ký đăng xuất:', e);
+        }
+
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
     },

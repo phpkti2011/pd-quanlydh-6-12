@@ -2,13 +2,29 @@
 import { supabase } from './supabaseClient';
 import { authService } from './auth';
 
+export interface ActivityLog {
+    id: string;
+    created_at: string;
+    user_id: string | null;
+    user_name: string;
+    user_role: string | null;
+    action_type: string;
+    entity_type: string | null;
+    entity_id: string | null;
+    entity_uuid: string | null;
+    details: any;
+    source: string | null;
+    total_count: number;
+}
+
 export const logService = {
     /**
-     * Log a user activity
-     * @param actionType - e.g. 'LOGIN', 'ORDER_CREATE', 'ORDER_STATUS_UPDATE'
-     * @param entityType - e.g. 'order', 'payment', 'system'
-     * @param entityId - e.g. 'DH-123'
-     * @param details - Any specific details about the change
+     * Ghi lại hành động của người dùng.
+     *
+     * LƯU Ý: mọi thay đổi DỮ LIỆU (đơn hàng, khách hàng, nhân viên, công đoạn)
+     * đã được trigger trong CSDL tự ghi — xem setup_audit_trail.sql. Hàm này
+     * chỉ còn dùng cho những sự kiện mà CSDL không nhìn thấy được, cụ thể là
+     * đăng nhập / đăng xuất. Đừng gọi nó để ghi thay đổi dữ liệu, sẽ bị trùng.
      */
     logActivity: async (
         actionType: string,
@@ -17,67 +33,62 @@ export const logService = {
         details: any = {}
     ) => {
         try {
-            // Get current user info locally if possible to avoid extra calls, but session is best
             const session = await authService.getSession();
-            if (!session?.user) return; // Anonymous actions usually not logged or handled differently
+            if (!session?.user) return;
 
-            // We can fetch profile name efficiently or pass it in. 
-            // For now, let's try to get it from cache or session metadata if available.
-            // Or just fire and forget.
-
-            // Note: In a real app, we might want to queue these or handle them in a way that doesn't block UI.
-            // For simplicity, we'll just await lightly or not await.
-
-            // To get user_name, we might need to query profiles if not in specific context. 
-            // However, usually we have userProfile in App context. 
-            // Let's assume the DB trigger might fill user_name or we fetch it.
-            // For now, let's just insert basic info.
+            // Lấy tên từ bảng profiles (nguồn chuẩn) thay vì auth.user_metadata —
+            // metadata chỉ được set lúc đăng ký nên đổi tên nhân viên là log sai.
+            let userName = session.user.email || 'Không rõ';
+            try {
+                const profile = await authService.getUserProfile(session.user.id);
+                if (profile?.full_name) userName = profile.full_name;
+            } catch {
+                // Không lấy được profile thì dùng email, không chặn việc ghi log
+            }
 
             const { error } = await supabase.from('user_logs').insert({
                 user_id: session.user.id,
-                user_name: session.user.user_metadata?.full_name || session.user.email || 'Unknown',
+                user_name: userName,
                 action_type: actionType,
                 entity_type: entityType,
                 entity_id: entityId,
-                details: details
+                details: details,
+                source: 'app'
             });
 
-            if (error) console.error('Log Error:', error);
+            if (error) console.error('Ghi nhật ký thất bại:', actionType, error.message);
 
         } catch (err) {
-            console.error('Logging failed:', err);
+            console.error('Ghi nhật ký thất bại:', err);
         }
-
-
     },
 
     /**
-     * Fetch logs for viewing
+     * Đọc nhật ký hoạt động qua RPC get_activity_logs.
+     * RPC join sang profiles để lấy tên hiện tại và hỗ trợ phân trang.
      */
     getLogs: async (filters: {
         userId?: string;
         actionType?: string;
+        entityType?: string;
         startDate?: string;
         endDate?: string;
         entityId?: string;
-    }) => {
-        let query = supabase
-            .from('user_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(100); // Pagination later if needed
+        limit?: number;
+        offset?: number;
+    }): Promise<ActivityLog[]> => {
+        const { data, error } = await supabase.rpc('get_activity_logs', {
+            p_user_id: filters.userId || null,
+            p_action_type: filters.actionType || null,
+            p_entity_type: filters.entityType || null,
+            p_entity_id: filters.entityId || null,
+            p_start: filters.startDate || null,
+            p_end: filters.endDate ? filters.endDate + 'T23:59:59' : null,
+            p_limit: filters.limit ?? 50,
+            p_offset: filters.offset ?? 0
+        });
 
-        if (filters.userId) query = query.eq('user_id', filters.userId);
-        if (filters.actionType) query = query.eq('action_type', filters.actionType);
-        if (filters.entityId) query = query.ilike('entity_id', `%${filters.entityId}%`);
-        if (filters.startDate) query = query.gte('created_at', filters.startDate);
-        if (filters.endDate) query = query.lte('created_at', filters.endDate + 'T23:59:59');
-
-        const { data, error } = await query;
         if (error) throw error;
-
-        // Enrich user_name if missing (optional step if we didn't save it)
-        // ideally we join with profiles but let's stick to single table for simplicity first
-        return data || [];
+        return (data || []) as ActivityLog[];
     }
 };
