@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { logService, ActivityLog } from '../../services/logService';
+import { logService, ActivityLog, isAuditTrailMissing } from '../../services/logService';
 import { supabase } from '../../services/supabaseClient';
 import { Profile } from '../../types';
 
@@ -42,6 +42,7 @@ const ActivityLogModal: React.FC<Props> = ({ isOpen, onClose, initialOrderCode }
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [auditMissing, setAuditMissing] = useState(false);
 
     // Filters
     const [users, setUsers] = useState<Profile[]>([]);
@@ -105,6 +106,7 @@ const ActivityLogModal: React.FC<Props> = ({ isOpen, onClose, initialOrderCode }
                 if (data.length > 0) setTotal(Number(data[0].total_count));
                 setLogs(prev => [...prev, ...data]);
             }
+            setAuditMissing(isAuditTrailMissing());
         } catch (err: any) {
             console.error(err);
             setError(err?.message || 'Không tải được nhật ký hoạt động');
@@ -514,6 +516,20 @@ const ActivityLogModal: React.FC<Props> = ({ isOpen, onClose, initialOrderCode }
                         Xóa lọc
                     </button>
                 </div>
+
+                {auditMissing && (
+                    <div className="mx-4 mt-3 p-3 rounded bg-amber-50 border border-amber-300 text-amber-900 text-sm">
+                        <div className="font-bold">
+                            <i className="fa-solid fa-triangle-exclamation mr-1"></i>
+                            Chưa cài đặt nhật ký ở tầng cơ sở dữ liệu
+                        </div>
+                        <div className="text-xs mt-1">
+                            Đang hiển thị nhật ký cũ. <b>Các thao tác mới sẽ KHÔNG được ghi lại</b> cho tới khi
+                            chạy file <code className="bg-amber-100 px-1 rounded">setup_audit_trail.sql</code> trong
+                            Supabase → SQL Editor.
+                        </div>
+                    </div>
+                )}
 
                 {error && (
                     <div className="mx-4 mt-3 p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">
