@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalesCommissionResult } from '../../types';
 import { supabase } from '../../services/supabaseClient';
+import { resolveCommissionScope } from '../../utils/commissionAccess';
 
 interface Props {
     isOpen: boolean;
@@ -17,8 +18,10 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'KeToan';
-    const isSales = currentUserRole === 'NhanVienKinhDoanh';
+    // Quyết định tập trung ở utils/commissionAccess: chỉ Admin xem được toàn bộ.
+    // Trước đây lọc theo `isSales` so khớp chính xác chuỗi 'NhanVienKinhDoanh',
+    // nên ai mang biến thể 'Nhân Viên Kinh Doanh' là không bị lọc gì cả.
+    const scope = resolveCommissionScope(currentUserRole, currentUserName);
 
     useEffect(() => {
         if (isOpen) {
@@ -39,6 +42,15 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     }, [isOpen]);
 
     const handleCalculate = async (start = startDate, end = endDate) => {
+        // Không xác định được xem của ai thì TỪ CHỐI ngay, không tải dữ liệu.
+        // Màn hình này tính toán trên trình duyệt nên nếu tải về là dữ liệu
+        // của mọi người đã nằm sẵn trong máy nhân viên.
+        if (scope.blocked) {
+            setEvaluations([]);
+            setError(scope.reason || 'Bạn không có quyền xem báo cáo này.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
@@ -191,10 +203,13 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                 };
             }).filter(item => item !== null) as SalesCommissionResult[];
 
-            // Filter if Sales Staff
+            // Không phải Admin thì LUÔN lọc về chính mình. Nếu không xác định
+            // được tên thì hiện rỗng, tuyệt đối không để lọt thành "không lọc".
             let displayedData = results;
-            if (isSales && currentUserName) {
-                displayedData = results.filter(item => item.sales_rep_name === currentUserName);
+            if (!scope.canViewAll) {
+                displayedData = scope.filterName
+                    ? results.filter(item => item.sales_rep_name === scope.filterName)
+                    : [];
             }
 
             setDeptTotalSales(groupSalesTotal);
@@ -262,7 +277,7 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
 
                 <h2 className="text-xl font-bold mb-4 text-indigo-700">
                     <i className="fa-solid fa-chart-line mr-2"></i>
-                    Đánh Giá & KPI {isSales ? 'Cá Nhân' : 'Nhân Viên Kinh Doanh'}
+                    Đánh Giá & KPI {!scope.canViewAll ? 'Cá Nhân' : 'Nhân Viên Kinh Doanh'}
                 </h2>
 
                 {/* Filter */}
@@ -328,7 +343,7 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                 </div>
 
                 <h3 className="text-lg font-bold text-gray-800 mb-4 border-l-4 border-orange-500 pl-3">
-                    {isSales ? 'KPI Cá Nhân' : 'Chi Tiết Nhân Viên'}
+                    {!scope.canViewAll ? 'KPI Cá Nhân' : 'Chi Tiết Nhân Viên'}
                 </h3>
 
                 <div className="space-y-6">

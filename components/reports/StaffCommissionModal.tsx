@@ -44,6 +44,7 @@ const STAGE_NAMES: Record<string, string> = {
 
 import { StageCommissionConfig } from './StageCommissionConfig'; // Import Config Component
 import { DefectDeductionTab } from './DefectDeductionTab';
+import { resolveCommissionScope } from '../../utils/commissionAccess';
 
 const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRole, currentUserName }) => {
     const [activeTab, setActiveTab] = useState<'report' | 'config' | 'deduction'>('report'); // Tab State
@@ -81,7 +82,8 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     const [loadingDetails, setLoadingDetails] = useState(false);
 
     // Props from parent: currentUserRole, currentUserName
-    const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'KeToan' || currentUserRole === 'QuanLySanXuat';
+    // Quyền xem thưởng của người khác — quyết định tập trung ở utils/commissionAccess
+    const scope = resolveCommissionScope(currentUserRole, currentUserName);
     // Only Admin can configure
     const canConfigure = currentUserRole === 'Admin' || currentUserRole === 'KeToan';
     // Khoản trừ sai hỏng: CHỈ Admin, không gồm Kế toán lẫn Quản lý sản xuất
@@ -106,14 +108,19 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     }, [isOpen]);
 
     const handleCalculate = async () => {
+        // Không xác định được xem thưởng của ai thì TỪ CHỐI, không gọi API.
+        // Nếu gọi với tên rỗng, phía CSDL hiểu là "lấy tất cả mọi người".
+        if (scope.blocked) {
+            setResults([]);
+            setError(scope.reason || 'Bạn không có quyền xem báo cáo này.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
-            // If not admin, force userName filter
-            const filterName = isAdmin ? undefined : currentUserName;
-
             const [data, summary] = await Promise.all([
-                commissionService.calculateStaffCommission(startDate, endDate, filterName),
+                commissionService.calculateStaffCommission(startDate, endDate, scope.filterName),
                 commissionService.getProductionCommissionSummary(selectedMonth, selectedYear)
             ]);
             setResults(data);
@@ -133,6 +140,9 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             setDetails([]);
             return;
         }
+
+        // Không được xem của người khác thì không bung chi tiết của họ
+        if (!scope.canViewAll && userName !== scope.filterName) return;
 
         setExpandedUser(userName);
         setLoadingDetails(true);

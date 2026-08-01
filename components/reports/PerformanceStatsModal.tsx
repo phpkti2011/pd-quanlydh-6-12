@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { commissionService } from '../../services/commissionService';
+import { resolveCommissionScope } from '../../utils/commissionAccess';
 
 interface Props {
     isOpen: boolean;
@@ -27,7 +28,8 @@ const PerformanceStatsModal: React.FC<Props> = ({ isOpen, onClose, currentUserRo
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'KeToan' || currentUserRole === 'QuanLySanXuat';
+    // Quyết định tập trung ở utils/commissionAccess: chỉ Admin xem được toàn bộ
+    const scope = resolveCommissionScope(currentUserRole, currentUserName);
 
     useEffect(() => {
         if (isOpen) {
@@ -48,15 +50,18 @@ const PerformanceStatsModal: React.FC<Props> = ({ isOpen, onClose, currentUserRo
     }, [isOpen]);
 
     const handleCalculate = async (start = startDate, end = endDate) => {
+        // Không xác định được xem của ai thì TỪ CHỐI, không gọi API.
+        // Nếu gọi với tên rỗng, phía CSDL hiểu là "lấy tất cả mọi người".
+        if (scope.blocked) {
+            setStats([]);
+            setError(scope.reason || 'Bạn không có quyền xem báo cáo này.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
-            // Server-side filtering
-            const filterName = isAdmin ? undefined : currentUserName;
-            const data = await commissionService.getPerformanceStats(start, end, filterName);
-
-            // Client-side filtering as backup (or removed if server side is enough)
-            // But let's keep it consistent with server data.
+            const data = await commissionService.getPerformanceStats(start, end, scope.filterName);
             setStats(data as PerformanceStat[]);
         } catch (err: any) {
             setError(err.message || 'Lỗi khi tải thống kê.');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { commissionService } from '../../services/commissionService';
 import { SalesCommissionResult } from '../../types';
+import { resolveCommissionScope } from '../../utils/commissionAccess';
 
 interface Props {
     isOpen: boolean;
@@ -30,7 +31,18 @@ const SalesCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
         }
     }, [isOpen]);
 
+    // Quyết định tập trung ở utils/commissionAccess: chỉ Admin xem được toàn bộ
+    const scope = resolveCommissionScope(currentUserRole, currentUserName);
+
     const handleCalculate = async () => {
+        // Không xác định được xem thưởng của ai thì TỪ CHỐI, không gọi API.
+        // Nếu gọi với tên rỗng, phía CSDL hiểu là "lấy tất cả mọi người".
+        if (scope.blocked) {
+            setResults([]);
+            setError(scope.reason || 'Bạn không có quyền xem báo cáo này.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
@@ -42,16 +54,7 @@ const SalesCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
             const endDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${lastDay}`;
 
-            // Restriction Logic: Only Admin can see ALL. Others see OWN only.
-            // User requested: "chỉ admin được xem toàn bộ, kế toán không được xem"
-            const isViewAllAllowed = currentUserRole === 'Admin';
-            const filterName = isViewAllAllowed ? undefined : currentUserName;
-
-            // If not Admin and no name, return empty or handle error?
-            // Usually currentUserName should be present.
-
-            const data = await commissionService.calculateSalesCommission(startDate, endDate, filterName);
-            console.log("Comm Data:", data);
+            const data = await commissionService.calculateSalesCommission(startDate, endDate, scope.filterName);
             setResults(data);
         } catch (err: any) {
             setError(err.message || 'Lỗi khi tính toán.');

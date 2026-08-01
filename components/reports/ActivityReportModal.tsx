@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { commissionService } from '../../services/commissionService';
 import { supabase } from '../../services/supabaseClient';
+import { resolveCommissionScope } from '../../utils/commissionAccess';
 
 interface Props {
     isOpen: boolean;
@@ -54,7 +55,9 @@ const ActivityReportModal: React.FC<Props> = ({ isOpen, onClose, currentUserRole
     const [users, setUsers] = useState<any[]>([]);
     const [selectedUser, setSelectedUser] = useState<string>('');
 
-    const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'KeToan' || currentUserRole === 'QuanLySanXuat';
+    // Quyết định tập trung ở utils/commissionAccess: chỉ Admin xem được toàn bộ
+    const scope = resolveCommissionScope(currentUserRole, currentUserName);
+    const isAdmin = scope.canViewAll;
 
     // Helper to update dates from Month/Year selection
     const toLocalISO = (d: Date) => {
@@ -99,13 +102,21 @@ const ActivityReportModal: React.FC<Props> = ({ isOpen, onClose, currentUserRole
     }, [isOpen, isAdmin, currentUserName]);
 
     const handleCalculate = async () => {
+        // Không xác định được xem của ai thì TỪ CHỐI, không gọi API.
+        // Nếu gọi với tên rỗng, phía CSDL hiểu là "lấy tất cả mọi người".
+        if (scope.blocked) {
+            setResults([]);
+            setError(scope.reason || 'Bạn không có quyền xem báo cáo này.');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
-            // For non-admin, selectedUser is already set in effect, but ensure uniqueness
-            const userToQuery = isAdmin ? selectedUser : currentUserName;
+            // Admin: theo người được chọn (rỗng = tất cả). Người khác: ép về chính họ.
+            const userToQuery = scope.canViewAll ? (selectedUser || undefined) : scope.filterName;
 
-            const data = await commissionService.getStaffActivityDetails(startDate, endDate, userToQuery || undefined);
+            const data = await commissionService.getStaffActivityDetails(startDate, endDate, userToQuery);
             setResults(data as ActivityDetail[]);
         } catch (err: any) {
             setError(err.message || 'Lỗi khi tải báo cáo.');

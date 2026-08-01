@@ -966,7 +966,12 @@ const App: React.FC = () => {
         userProfile={userProfile}
         onProfileUpdate={() => {
           if (session?.user?.id) {
-            authService.getUserProfile(session.user.id).then(p => setUserProfile(p));
+            authService.getUserProfile(session.user.id).then(p => {
+              // Nạp lỗi thì GIỮ hồ sơ cũ. Ghi đè bằng null sẽ làm mất tên
+              // người dùng, khiến báo cáo thưởng không biết lọc theo ai.
+              if (p) setUserProfile(p);
+              else console.error('Không nạp lại được hồ sơ, giữ nguyên dữ liệu cũ.');
+            });
           }
         }}
       />

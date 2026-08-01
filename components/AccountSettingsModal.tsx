@@ -41,12 +41,21 @@ const AccountSettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, o
 
     const handleSaveInfo = async () => {
         if (!userProfile) return;
+
+        // Bắt buộc có Họ và tên: các báo cáo thưởng lọc theo tên này, để trống
+        // sẽ khiến hệ thống không xác định được xem thưởng của ai.
+        const fullName = (formData.full_name || '').trim();
+        if (!fullName) {
+            alert('Vui lòng nhập Họ và tên. Không được để trống.');
+            return;
+        }
+
         setLoading(true);
         try {
             const { error } = await supabase
                 .from('profiles')
                 .update({
-                    full_name: formData.full_name,
+                    full_name: fullName,
                     phone_number: formData.phone_number,
                     position: formData.position
                 })
