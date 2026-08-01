@@ -43,14 +43,19 @@ const STAGE_NAMES: Record<string, string> = {
 };
 
 import { StageCommissionConfig } from './StageCommissionConfig'; // Import Config Component
+import { DefectDeductionTab } from './DefectDeductionTab';
 
 const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRole, currentUserName }) => {
-    const [activeTab, setActiveTab] = useState<'report' | 'config'>('report'); // Tab State
+    const [activeTab, setActiveTab] = useState<'report' | 'config' | 'deduction'>('report'); // Tab State
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [results, setResults] = useState<StaffCommissionResult[]>([]);
+    // Tháng/năm ứng với `results` đang hiển thị — tab Trừ sai hỏng cần biết để
+    // chỉ tính phần chia khi đúng tháng đó
+    const [resultsMonth, setResultsMonth] = useState(0);
+    const [resultsYear, setResultsYear] = useState(0);
     const [tierSummary, setTierSummary] = useState<ProductionTierSummary | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -79,6 +84,8 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'KeToan' || currentUserRole === 'QuanLySanXuat';
     // Only Admin can configure
     const canConfigure = currentUserRole === 'Admin' || currentUserRole === 'KeToan';
+    // Khoản trừ sai hỏng: CHỈ Admin, không gồm Kế toán lẫn Quản lý sản xuất
+    const isSuperAdmin = currentUserRole === 'Admin';
 
     useEffect(() => {
         if (isOpen) {
@@ -110,6 +117,8 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                 commissionService.getProductionCommissionSummary(selectedMonth, selectedYear)
             ]);
             setResults(data);
+            setResultsMonth(selectedMonth);
+            setResultsYear(selectedYear);
             setTierSummary(summary);
         } catch (err: any) {
             setError(err.message || 'Lỗi khi tính toán.');
@@ -172,12 +181,33 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                         >
                             Cấu hình
                         </button>
+                        {/* Chỉ Admin — Kế toán và Quản lý SX không thấy tab này */}
+                        {isSuperAdmin && (
+                            <button
+                                className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'deduction' ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => setActiveTab('deduction')}
+                            >
+                                <i className="fa-solid fa-lock text-[10px] mr-1"></i>
+                                Trừ sai hỏng
+                            </button>
+                        )}
                     </div>
                 )}
 
                 {/* Tab Content: CONFIG */}
                 {activeTab === 'config' && (
                     <StageCommissionConfig />
+                )}
+
+                {/* Tab Content: TRỪ SAI HỎNG (chỉ Admin) */}
+                {activeTab === 'deduction' && isSuperAdmin && (
+                    <DefectDeductionTab
+                        defaultMonth={selectedMonth}
+                        defaultYear={selectedYear}
+                        results={results}
+                        resultsMonth={resultsMonth}
+                        resultsYear={resultsYear}
+                    />
                 )}
 
                 {/* Tab Content: REPORT */}
@@ -325,6 +355,9 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thưởng CV Chính</th>
                                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thưởng CV Phụ</th>
                                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Hệ số</th>
+                                        {isSuperAdmin && (
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-red-600 uppercase tracking-wider">Trừ sai hỏng</th>
+                                        )}
                                         <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Tổng Thưởng</th>
                                     </tr>
                                 </thead>
@@ -356,11 +389,18 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                                             <span className="text-xs text-gray-400">—</span>
                                                         )}
                                                     </td>
+                                                    {isSuperAdmin && (
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                                                            {(item.deduction_amount || 0) > 0
+                                                                ? <span className="text-red-600 font-medium">-{(item.deduction_amount || 0).toLocaleString('vi-VN')} đ</span>
+                                                                : <span className="text-gray-300">—</span>}
+                                                        </td>
+                                                    )}
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-purple-700 font-bold">{(item.total_comm || 0).toLocaleString('vi-VN')} đ</td>
                                                 </tr>
                                                 {expandedUser === item.participant_name && (
                                                     <tr>
-                                                        <td colSpan={5} className="px-4 py-4 bg-gray-50 border-b border-gray-200">
+                                                        <td colSpan={isSuperAdmin ? 6 : 5} className="px-4 py-4 bg-gray-50 border-b border-gray-200">
                                                             <div className="bg-white rounded border border-gray-200 overflow-hidden">
                                                                 {loadingDetails ? (
                                                                     <div className="p-4 text-center text-gray-500 text-sm">
@@ -395,7 +435,10 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                                                                     <td className="px-4 py-2 text-center text-xs text-gray-500">{d.participant_count} người</td>
                                                                                     <td className="px-4 py-2 text-right text-xs text-gray-600">{d.process_comm?.toLocaleString()}</td>
                                                                                     <td className="px-4 py-2 text-right text-xs text-blue-600">{d.stage_comm?.toLocaleString()}</td>
-                                                                                    <td className="px-4 py-2 text-right text-xs font-bold text-purple-700">{(d.process_comm + d.stage_comm).toLocaleString()}</td>
+                                                                                    {/* Dùng total_comm từ CSDL, KHÔNG tự cộng process+stage:
+                                                                                        phép cộng tay bỏ mất hệ số mốc doanh số nên tháng có
+                                                                                        hệ số khác 100% sẽ lệch với dòng tổng ở bảng cha. */}
+                                                                                    <td className="px-4 py-2 text-right text-xs font-bold text-purple-700">{(d.total_comm || 0).toLocaleString()}</td>
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>
@@ -413,7 +456,7 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                            <td colSpan={isSuperAdmin ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
                                                 {loading ? 'Đang tính toán...' : 'Chưa có dữ liệu. Vui lòng chọn thời gian và bấm "Tính toán".'}
                                             </td>
                                         </tr>
@@ -426,6 +469,14 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                             <td className="px-6 py-3 text-right">{results.reduce((sum, i) => sum + (i.main_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                             <td className="px-6 py-3 text-right">{results.reduce((sum, i) => sum + (i.sub_task_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                             <td className="px-6 py-3"></td>
+                                            {isSuperAdmin && (
+                                                <td className="px-6 py-3 text-right text-red-600">
+                                                    {(() => {
+                                                        const t = results.reduce((sum, i) => sum + (i.deduction_amount || 0), 0);
+                                                        return t > 0 ? `-${t.toLocaleString('vi-VN')} đ` : '—';
+                                                    })()}
+                                                </td>
+                                            )}
                                             <td className="px-6 py-3 text-right text-purple-700">{results.reduce((sum, i) => sum + (i.total_comm || 0), 0).toLocaleString('vi-VN')} đ</td>
                                         </tr>
                                     </tfoot>

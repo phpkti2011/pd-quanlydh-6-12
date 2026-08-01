@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { SalesCommissionResult, StaffCommissionResult, CommissionPolicy, ProductionTierSummary } from '../types';
+import { SalesCommissionResult, StaffCommissionResult, CommissionPolicy, ProductionTierSummary, DefectDeduction } from '../types';
 
 export const commissionService = {
     /**
@@ -237,5 +237,53 @@ export const commissionService = {
             return data[0] as ProductionTierSummary;
         }
         return null;
+    },
+
+    // ===== TRỪ SAI HỎNG SẢN XUẤT =====
+    // Bảng production_defect_deductions bị RLS khoá chỉ cho Admin, nên nhân viên
+    // gọi các hàm này sẽ nhận danh sách rỗng / bị từ chối ghi.
+
+    async getDefectDeductions(month: number, year: number): Promise<DefectDeduction[]> {
+        const { data, error } = await supabase
+            .from('production_defect_deductions')
+            .select('*, created_by_user:created_by(full_name)')
+            .eq('period_month', month)
+            .eq('period_year', year)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []) as DefectDeduction[];
+    },
+
+    async addDefectDeduction(input: {
+        month: number;
+        year: number;
+        amount: number;
+        reason?: string;
+        orderCode?: string;
+    }) {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        const { error } = await supabase
+            .from('production_defect_deductions')
+            .insert({
+                period_month: input.month,
+                period_year: input.year,
+                amount: input.amount,
+                reason: input.reason || null,
+                order_code: input.orderCode || null,
+                created_by: session?.user?.id || null
+            });
+
+        if (error) throw error;
+    },
+
+    async deleteDefectDeduction(id: string) {
+        const { error } = await supabase
+            .from('production_defect_deductions')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
     }
 };

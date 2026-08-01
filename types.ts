@@ -188,8 +188,22 @@ export interface StaffCommissionResult {
   sub_task_comm: number;
   total_comm: number;
   tier_percentage?: number;          // Hệ số mốc thưởng sản xuất (0, 70, 100, 150)
+  deduction_amount?: number;         // Phần trừ sai hỏng — chỉ Admin nhận số thật, người khác nhận 0
   completed_sales?: number;
   completed_order_count?: number;
+}
+
+// Khoản trừ do sản xuất làm sai hỏng, nhập theo tháng, chỉ Admin xem/sửa được
+export interface DefectDeduction {
+  id: string;
+  period_month: number;
+  period_year: number;
+  amount: number;
+  reason?: string;
+  order_code?: string;
+  created_by?: string;
+  created_at: string;
+  created_by_user?: { full_name?: string } | null;
 }
 
 export interface ProductionTierSummary {
