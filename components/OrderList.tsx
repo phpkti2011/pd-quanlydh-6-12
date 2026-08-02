@@ -29,7 +29,17 @@ interface OrderListProps {
 const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, currentUser, tabCounts, currentTab }) => {
   // const [currentTab, setCurrentTab] = useState('all'); // Removed internal state
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  // Hoàn tác đơn ĐÃ HOÀN THÀNH: chỉ Admin.
+  // Đưa đơn ra khỏi trạng thái Hoàn thành sẽ xoá completed_at (xem
+  // setup_step5_completed_at.sql), khiến đơn rơi khỏi doanh số của tháng.
+  const canUndoComplete = ['Admin', 'admin'].includes(currentUser?.role);
+
+  const handleStatusChange = async (orderId: string, newStatus: string, oldStatus: string) => {
+    if (oldStatus === 'HoanThanh' && newStatus !== 'HoanThanh') {
+      if (!confirm("Đơn này đang Hoàn thành. Hoàn tác sẽ xoá ngày hoàn thành và làm đơn không còn được tính vào doanh số tháng. Tiếp tục?")) {
+        return;
+      }
+    }
     try {
       await orderService.updateStatus(orderId, newStatus as any);
       onRefresh();
@@ -152,7 +162,11 @@ const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, curren
                   <select
                     className="border border-gray-300 rounded text-xs py-1 px-2 w-full focus:ring-1 focus:ring-[#00796b]"
                     value={order.status}
-                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                    onChange={(e) => handleStatusChange(order.id, e.target.value, order.status)}
+                    disabled={order.status === 'HoanThanh' && !canUndoComplete}
+                    title={order.status === 'HoanThanh' && !canUndoComplete
+                      ? "Chỉ Admin mới đổi được trạng thái đơn đã hoàn thành."
+                      : undefined}
                   >
                     <option value="Moi">Mới</option>
                     <option value="TiepNhan">Tiếp nhận</option>

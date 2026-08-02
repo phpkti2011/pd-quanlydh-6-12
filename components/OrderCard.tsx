@@ -38,6 +38,10 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
     const canConfirmPayment = ['Admin', 'admin'].includes(currentUser?.role);
     // Restore cancelled order
     const canRestoreOrder = ['Admin', 'NhanVienKinhDoanh'].includes(currentUser?.role);
+    // Hoàn tác đơn ĐÃ HOÀN THÀNH: chỉ Admin.
+    // Đưa đơn ra khỏi trạng thái Hoàn thành sẽ xoá completed_at (xem
+    // setup_step5_completed_at.sql), khiến đơn rơi khỏi doanh số của tháng.
+    const canUndoComplete = ['Admin', 'admin'].includes(currentUser?.role);
 
     const [editingField, setEditingField] = React.useState<{ field: keyof Order | 'payment_note', title: string, value: string } | null>(null);
     const [showPaymentConfirmModal, setShowPaymentConfirmModal] = React.useState(false);
@@ -127,6 +131,13 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
 
     // Helper to handle button clicks
     const handleAction = async (action: string) => {
+        // Chặn dự phòng: nút đã bị disabled, nhưng chặn thêm ở đây để nếu sau này
+        // ai đó đổi giao diện thì quyền vẫn còn nguyên.
+        if (action === 'Hoàn tác' && !canUndoComplete) {
+            alert('Chỉ Admin mới hoàn tác được đơn đã hoàn thành. Vui lòng liên hệ Admin.');
+            return;
+        }
+
         // Skip confirmation for non-destructive actions like History or Print or Resume
         if (action !== 'Lịch sử' && action !== 'In phiếu' && action !== 'In phiếu giao hàng' && action !== 'Tiếp tục' && !confirm(`Bạn có chắc chắn muốn ${action} đơn hàng này ? `)) return;
 
@@ -357,6 +368,15 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                                 const newStatus = e.target.value as any;
                                 const oldStatus = optimisticStatus;
 
+                                // Đưa đơn RA KHỎI trạng thái Hoàn thành sẽ xoá completed_at
+                                // -> đơn không còn được tính vào doanh số tháng. Hỏi lại cho chắc.
+                                if (oldStatus === 'HoanThanh' && newStatus !== 'HoanThanh') {
+                                    if (!confirm("Đơn này đang Hoàn thành. Hoàn tác sẽ xoá ngày hoàn thành và làm đơn không còn được tính vào doanh số tháng. Tiếp tục?")) {
+                                        e.target.value = oldStatus;
+                                        return;
+                                    }
+                                }
+
                                 // Optimistic Update (Instant)
                                 setOptimisticStatus(newStatus);
 
@@ -369,7 +389,10 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                                     alert("Lỗi cập nhật trạng thái: " + (error as Error).message);
                                 }
                             }}
-                            disabled={isPaused}
+                            disabled={isPaused || (isCompleted && !canUndoComplete)}
+                            title={isCompleted && !canUndoComplete
+                                ? "Chỉ Admin mới đổi được trạng thái đơn đã hoàn thành."
+                                : undefined}
                         >
                             {WORKFLOW_STATUS_KEYS.map(key => (
                                 <option key={key} value={key}>{STATUS_LABEL_MAP[key]}</option>
@@ -908,7 +931,16 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
 
                         {
                             isCompleted ? (
-                                <ActionButton icon="fa-rotate-left" color={COLORS.warning} onClick={() => handleAction("Hoàn tác")} title="Hoàn tác (Trở lại Đã Giao Hàng)" disabled={isPaused} label="Hoàn tác" />
+                                <ActionButton
+                                    icon="fa-rotate-left"
+                                    color={COLORS.warning}
+                                    onClick={() => handleAction("Hoàn tác")}
+                                    title={canUndoComplete
+                                        ? "Hoàn tác (Trở lại Đã Giao Hàng)"
+                                        : "Chỉ Admin mới hoàn tác được. Vui lòng liên hệ Admin."}
+                                    disabled={isPaused || !canUndoComplete}
+                                    label="Hoàn tác"
+                                />
                             ) : (
                                 <ActionButton icon="fa-check" color={COLORS.actionComplete} onClick={() => handleAction("Hoàn thành")} title="Hoàn thành" disabled={isPaused} label="Hoàn thành" />
                             )
