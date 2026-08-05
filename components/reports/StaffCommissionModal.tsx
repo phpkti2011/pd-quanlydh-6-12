@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { commissionService } from '../../services/commissionService';
+import { compareVietnameseName } from '../../utils/nameSort';
 import { StaffCommissionResult, ProductionTierSummary } from '../../types';
 
 interface DetailItem {
@@ -88,6 +89,13 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     const canConfigure = currentUserRole === 'Admin' || currentUserRole === 'KeToan';
     // Khoản trừ sai hỏng: CHỈ Admin, không gồm Kế toán lẫn Quản lý sản xuất
     const isSuperAdmin = currentUserRole === 'Admin';
+
+    // Xếp theo TÊN GỌI (chữ cuối) theo quy ước Việt Nam. Sắp trên bản sao để
+    // `results` gốc giữ nguyên cho dòng Tổng cộng và tab Trừ sai hỏng.
+    const sortedResults = useMemo(
+        () => [...results].sort((a, b) => compareVietnameseName(a.participant_name, b.participant_name)),
+        [results]
+    );
 
     useEffect(() => {
         if (isOpen) {
@@ -372,8 +380,8 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {results.length > 0 ? (
-                                        results.map((item, index) => (
+                                    {sortedResults.length > 0 ? (
+                                        sortedResults.map((item, index) => (
                                             <React.Fragment key={index}>
                                                 <tr
                                                     className={`hover:bg-gray-50 cursor-pointer transition-colors ${expandedUser === item.participant_name ? 'bg-purple-50' : ''}`}
