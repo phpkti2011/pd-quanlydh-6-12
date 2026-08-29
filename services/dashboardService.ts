@@ -58,7 +58,7 @@ export const dashboardService = {
             .select(`
                 *,
                 sales_rep:sales_rep_id (full_name),
-                customer:customer_id (id, source, tags)
+                customer:customer_id (id, name, source, tags)
             `)
             .gte('created_at', start.toISOString())
             .lte('created_at', end.toISOString());

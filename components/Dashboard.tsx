@@ -4,6 +4,9 @@ import { dashboardService, DashboardStats } from '../services/dashboardService';
 import { orderService } from '../services/orderService';
 import { customerService } from '../services/customerService';
 import { STATUS_LABEL_MAP } from '../constants';
+import { Order } from '../types';
+import OrderCard from './OrderCard';
+import ActivityLogModal from './reports/ActivityLogModal';
 
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -26,7 +29,17 @@ const COLORS = {
 
 const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#e91e63', '#607d8b'];
 
-const Dashboard: React.FC = () => {
+/** Vai trò được xem lịch sử đơn — giữ đúng như nút "Lịch sử HĐ" ở App.tsx, không nới thêm. */
+const HISTORY_ROLES = ['Admin', 'KeToan', 'QuanLySanXuat'];
+
+interface DashboardProps {
+  /** { ...session.user, role } — OrderCard phân quyền thao tác theo trường này */
+  currentUser?: any;
+  /** Mở form sửa đơn ở App (OrderModal) */
+  onEditOrder?: (order: Order) => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, onEditOrder }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [debtStats, setDebtStats] = useState({ totalAmount: 0, count: 0 });
   const [collectionStats, setCollectionStats] = useState({ totalAmount: 0, count: 0 });
@@ -37,6 +50,11 @@ const Dashboard: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [atRiskVIP, setAtRiskVIP] = useState<{ id: string; name: string; code: string; phone?: string; total_revenue: number; total_orders: number; days_since_last_order: number | null }[]>([]);
   const [showNewCustomers, setShowNewCustomers] = useState(false);
+
+  // Xem chi tiết 1 đơn ngay trên màn Tổng quan
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const [historyOrderCode, setHistoryOrderCode] = useState<string | null>(null);
 
   const loadStats = async () => {
     setLoading(true);
@@ -58,6 +76,46 @@ const Dashboard: React.FC = () => {
       loadStats();
     }
   }, [period]);
+
+  /**
+   * Mở thẻ chi tiết một đơn.
+   * BẮT BUỘC tải lại bằng getById: dữ liệu của bảng Tổng quan không join
+   * order_process_participants, mà OrderCard cần order.participants để hiện
+   * ai làm công đoạn nào.
+   */
+  const openOrderDetail = async (orderId: string) => {
+    setDetailLoadingId(orderId);
+    try {
+      const full = await orderService.getById(orderId);
+      setDetailOrder(full);
+    } catch (err: any) {
+      console.error('Load order detail error:', err);
+      alert('Không tải được chi tiết đơn hàng: ' + (err?.message || 'Lỗi không rõ'));
+    } finally {
+      setDetailLoadingId(null);
+    }
+  };
+
+  // Sau khi thao tác trong thẻ: cập nhật cả thẻ đang mở lẫn bảng phía sau
+  const refreshOrderDetail = async () => {
+    if (detailOrder) {
+      try {
+        setDetailOrder(await orderService.getById(detailOrder.id));
+      } catch (err) {
+        console.error('Refresh order detail error:', err);
+      }
+    }
+    loadStats();
+  };
+
+  const handleViewHistory = (orderCode: string) => {
+    // Giữ đúng quyền của nút "Lịch sử HĐ" trên thanh công cụ, không nới thêm
+    if (!HISTORY_ROLES.includes(currentUser?.role)) {
+      alert('Bạn không có quyền xem lịch sử đơn hàng.');
+      return;
+    }
+    setHistoryOrderCode(orderCode);
+  };
 
   // Fetch Debt & Collection Overview (Always Global/All Time)
   useEffect(() => {
@@ -534,8 +592,18 @@ const Dashboard: React.FC = () => {
                         {STATUS_LABEL_MAP[order.status] || order.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-blue-600">
-                      {order.order_code || '---'}
+                    <td className="px-4 py-3 font-medium">
+                      {order.order_code ? (
+                        <button
+                          onClick={() => openOrderDetail(order.id)}
+                          disabled={detailLoadingId === order.id}
+                          title="Xem chi tiết đơn hàng"
+                          className="text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-60 inline-flex items-center gap-1.5"
+                        >
+                          {detailLoadingId === order.id && <i className="fa-solid fa-spinner fa-spin text-xs"></i>}
+                          {order.order_code}
+                        </button>
+                      ) : '---'}
                     </td>
                     <td className="px-4 py-3 text-gray-900">
                       {order.customer?.name || 'Khách lẻ'}
@@ -622,6 +690,50 @@ const Dashboard: React.FC = () => {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Chi tiết đơn hàng — dùng lại OrderCard của màn chính.
+          OrderCard là THẺ chứ không phải modal nên phải tự bọc lớp phủ.
+          Các hộp thoại con của nó (Sửa nhanh z-50, QR z-[60], Hóa đơn z-[70])
+          nằm BÊN TRONG lớp phủ này nên vẫn hiện lên trên. */}
+      {detailOrder && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[9999] flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => setDetailOrder(null)}
+        >
+          <div className="w-full max-w-2xl my-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setDetailOrder(null)}
+                className="px-3 py-1.5 bg-white/90 hover:bg-white text-gray-700 rounded-lg text-sm font-medium shadow flex items-center gap-2"
+              >
+                <i className="fa-solid fa-xmark"></i> Đóng
+              </button>
+            </div>
+            <OrderCard
+              order={detailOrder}
+              currentUser={currentUser}
+              onRefresh={refreshOrderDetail}
+              onEdit={(o) => {
+                setDetailOrder(null);
+                onEditOrder?.(o);
+              }}
+              onViewHistory={handleViewHistory}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Lịch sử đơn. Bọc thêm một lớp z cao hơn vì lớp phủ chi tiết ở z-[9999]
+          còn modal này tự đặt z-50 — không bọc thì nó nằm dưới. */}
+      {historyOrderCode && (
+        <div className="relative z-[10000]">
+          <ActivityLogModal
+            isOpen={true}
+            onClose={() => setHistoryOrderCode(null)}
+            initialOrderCode={historyOrderCode}
+          />
         </div>
       )}
     </div>

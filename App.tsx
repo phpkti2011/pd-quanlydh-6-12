@@ -786,7 +786,10 @@ const App: React.FC = () => {
         ) : (
           <>
             {currentTab === "📊 Tổng quan" ? (
-              <Dashboard />
+              <Dashboard
+                currentUser={{ ...session?.user, role: userRole }}
+                onEditOrder={handleEditOrder}
+              />
             ) : (
               // Order List View (For all other tabs)
               <>
