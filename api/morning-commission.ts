@@ -95,7 +95,8 @@ export default async function handler(req: any, res: any) {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .in('role', ['Admin', 'NhanVienSanXuat', 'QuanLySanXuat', 'NhanVienBinhFile', 'NhanVienThietKe']);
+      .in('role', ['Admin', 'NhanVienSanXuat', 'QuanLySanXuat', 'NhanVienBinhFile', 'NhanVienThietKe'])
+      .is('deleted_at', null); // Không gửi thông báo cho người đã nghỉ
 
     if (profilesError) {
       console.error('Profiles error:', profilesError);

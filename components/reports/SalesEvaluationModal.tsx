@@ -68,7 +68,8 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             const profilesPromise = supabase
                 .from('profiles')
                 .select('id, full_name')
-                .eq('role', 'NhanVienKinhDoanh');
+                .eq('role', 'NhanVienKinhDoanh')
+                .is('deleted_at', null); // Chỉ đánh giá NVKD còn đang làm
 
             const customersPromise = supabase
                 .from('customers')

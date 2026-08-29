@@ -382,7 +382,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isOpen, onClose }) =>
                                             <button
                                                 onClick={() => handleDeleteUser(emp)}
                                                 className="w-8 h-8 rounded-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white inline-flex items-center justify-center transition-colors"
-                                                title="Xóa vĩnh viễn"
+                                                title="Xóa nhân viên (ngưng làm việc, giữ lịch sử)"
                                             >
                                                 <i className="fa-solid fa-trash"></i>
                                             </button>

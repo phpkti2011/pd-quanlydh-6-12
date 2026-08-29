@@ -56,9 +56,25 @@ BEGIN
         RAISE EXCEPTION 'Access Denied: Only Admins can delete users.';
     END IF;
 
-    -- Delete from auth.users (This triggers CASCADE delete to profiles due to constraint on profiles.id)
-    -- And subsequently triggers the new constraints on orders, valid, etc.
-    DELETE FROM auth.users WHERE id = target_user_id;
+    -- XOÁ MỀM, KHÔNG xoá auth.users.
+    --
+    -- Bản cũ ở đây là `DELETE FROM auth.users WHERE id = target_user_id;` và nó
+    -- LUÔN thất bại: user_logs.user_id tham chiếu auth.users(id) mà không có
+    -- ON DELETE (create_audit_logs.sql:5), nên Postgres chặn với lỗi
+    -- "violates foreign key constraint user_logs_user_id_fkey".
+    -- Ai từng đăng nhập đều có dòng trong user_logs => hỏng với mọi nhân viên.
+    --
+    -- Ngoài ra order_process_participants.user_id là ON DELETE CASCADE, nên nếu
+    -- có xoá cứng được thì cũng mất sạch lịch sử công đoạn — đúng thứ hộp thoại
+    -- xác nhận ở giao diện hứa GIỮ LẠI.
+    --
+    -- ĐỪNG đưa DELETE quay lại. Xem fix_admin_delete_user_soft.sql.
+    UPDATE profiles
+    SET
+        deleted_at = NOW(),
+        is_locked  = TRUE,
+        updated_at = NOW()
+    WHERE id = target_user_id;
 END;
 $$;
 

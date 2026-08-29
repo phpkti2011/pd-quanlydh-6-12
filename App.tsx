@@ -149,8 +149,12 @@ const App: React.FC = () => {
       if (session?.user) {
         authService.getUserProfile(session.user.id).then(async profile => {
           if (profile) {
-            if (profile.is_locked) {
-              alert("Tài khoản của bạn đã bị KHÓA. Vui lòng liên hệ Admin.");
+            // deleted_at = đã nghỉ việc (xoá mềm). Hàm admin_delete_user đặt cả
+            // is_locked lẫn deleted_at, kiểm tra cả hai cho chắc.
+            if (profile.is_locked || profile.deleted_at) {
+              alert(profile.deleted_at
+                ? "Tài khoản của bạn đã ngừng hoạt động. Vui lòng liên hệ Admin."
+                : "Tài khoản của bạn đã bị KHÓA. Vui lòng liên hệ Admin.");
               await authService.signOut();
               setSession(null);
               return;

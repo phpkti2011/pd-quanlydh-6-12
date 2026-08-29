@@ -41,7 +41,8 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
     }, [isOpen, selectedMonth, selectedYear]);
 
     const fetchEmployees = async () => {
-        const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
+        // Ẩn người đã nghỉ: không đặt chỉ tiêu cho người không còn làm
+        const { data } = await supabase.from('profiles').select('*').is('deleted_at', null).order('full_name', { ascending: true });
         setEmployees(data || []);
     };
 

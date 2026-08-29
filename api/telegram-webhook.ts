@@ -229,7 +229,8 @@ async function getEmployeeStats(name?: string): Promise<string> {
   const { data: employees } = await db.from('profiles')
     .select('id, full_name, role')
     .eq('role', 'NhanVienKinhDoanh')
-    .or('is_locked.is.null,is_locked.eq.false');
+    .or('is_locked.is.null,is_locked.eq.false')
+    .is('deleted_at', null); // Bỏ người đã nghỉ
 
   if (!employees?.length) return `❌ Không có NVKD nào.`;
 

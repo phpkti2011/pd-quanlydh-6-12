@@ -6,6 +6,8 @@ export interface UserProfile {
     role?: string;
     full_name?: string;
     is_locked?: boolean;
+    /** Có giá trị = đã nghỉ việc (xoá mềm). Xem fix_admin_delete_user_soft.sql */
+    deleted_at?: string | null;
 }
 
 export const authService = {
@@ -72,7 +74,7 @@ export const authService = {
 
         const { data: profile, error } = await supabase
             .from('profiles')
-            .select('id, email, full_name, role, is_locked')
+            .select('id, email, full_name, role, is_locked, deleted_at')
             .eq('id', userId)
             .single();
 
@@ -92,7 +94,8 @@ export const authService = {
         const { data, error } = await supabase
             .from('profiles')
             .select('id, email, full_name, role')
-            .eq('role', 'NhanVienKinhDoanh');
+            .eq('role', 'NhanVienKinhDoanh')
+            .is('deleted_at', null); // Ẩn người đã nghỉ khỏi ô chọn NVKD
 
         if (error) {
             console.error("Error fetching sales reps:", error);
