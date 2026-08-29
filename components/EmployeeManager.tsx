@@ -5,6 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../constants';
 import { Profile, UserRole } from '../types';
 import { COLORS } from '../constants';
+import {
+    STAGE_COMMISSION_FIELDS,
+    SUBTASK_COMMISSION_FIELDS,
+    fillCommissionKeys,
+} from '../utils/commissionFields';
+import { ROLE_LABELS } from '../utils/roleLabels';
+import CommissionMatrix from './CommissionMatrix';
 
 interface EmployeeManagerProps {
     isOpen: boolean;
@@ -12,16 +19,6 @@ interface EmployeeManagerProps {
 }
 
 
-const ROLE_LABELS: Record<string, string> = {
-    'Admin': 'Admin',
-    'NhanVienKinhDoanh': 'Nhân viên Kinh doanh',
-    'NhanVienSanXuat': 'Nhân viên Sản xuất (Chung)',
-    'QuanLySanXuat': 'Quản lý Sản xuất',
-    'KeToan': 'Kế toán',
-    'Khach': 'Khách',
-    'NhanVienThietKe': 'Nhân viên Thiết kế',
-    'NhanVienBinhFile': 'Nhân viên Bình file',
-};
 
 const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isOpen, onClose }) => {
     const [employees, setEmployees] = useState<Profile[]>([]);
@@ -33,6 +30,29 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isOpen, onClose }) =>
 
     // Filter/Search (Simple)
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Khung nhìn: danh sách nhân viên vs bảng % hoa hồng toàn bộ nhân viên
+    const [viewMode, setViewMode] = useState<'list' | 'matrix'>('list');
+    // Bảng ma trận báo ngược lên khi còn ô sửa dở, để chặn rời màn hình
+    const [matrixDirty, setMatrixDirty] = useState(false);
+
+    // Rời bảng ma trận khi còn sửa dở thì hỏi lại, tránh mất công gõ.
+    const confirmLeaveMatrix = () =>
+        !matrixDirty ||
+        window.confirm('Bảng % hoa hồng còn thay đổi chưa lưu. Rời khỏi và bỏ các thay đổi đó?');
+
+    const handleCloseManager = () => {
+        if (viewMode === 'matrix' && !confirmLeaveMatrix()) return;
+        setMatrixDirty(false);
+        onClose();
+    };
+
+    const switchView = (mode: 'list' | 'matrix') => {
+        if (mode === viewMode) return;
+        if (viewMode === 'matrix' && !confirmLeaveMatrix()) return;
+        if (viewMode === 'matrix') setMatrixDirty(false);
+        setViewMode(mode);
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -229,18 +249,49 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isOpen, onClose }) =>
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-lg w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
+            <div className="bg-white rounded-lg w-full max-w-[92vw] h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <div>
                         <h2 className="text-xl font-bold text-gray-800">Quản lý Nhân Viên</h2>
                         <p className="text-sm text-gray-500">Danh sách và thông tin chi tiết nhân sự</p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={handleCloseManager} className="text-gray-400 hover:text-gray-600">
                         <i className="fa-solid fa-xmark text-2xl"></i>
                     </button>
                 </div>
 
+                {/* Chuyển khung nhìn */}
+                <div className="flex border-b border-gray-200 px-6 flex-shrink-0 bg-gray-50 flex-wrap">
+                    {([
+                        { key: 'list' as const, label: 'Danh sách nhân viên', icon: 'fa-list' },
+                        { key: 'matrix' as const, label: 'Bảng % hoa hồng', icon: 'fa-table' },
+                    ]).map(tab => (
+                        <button
+                            key={tab.key}
+                            className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 flex items-center gap-2 ${viewMode === tab.key
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                            onClick={() => switchView(tab.key)}
+                        >
+                            <i className={`fa-solid ${tab.icon}`}></i>
+                            {tab.label}
+                            {tab.key === 'matrix' && matrixDirty && (
+                                <span className="w-2 h-2 rounded-full bg-blue-500" title="Còn thay đổi chưa lưu"></span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {viewMode === 'matrix' ? (
+                    <CommissionMatrix
+                        employees={employees}
+                        onSaved={fetchEmployees}
+                        onDirtyChange={setMatrixDirty}
+                    />
+                ) : (
+                <>
                 {/* Toolbar */}
                 <div className="px-6 py-3 border-b border-gray-100 flex gap-4 bg-white">
                     <div className="relative flex-1 max-w-md">
@@ -342,6 +393,8 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ isOpen, onClose }) =>
                         </table>
                     </div>
                 </div>
+                </>
+                )}
             </div>
 
             {/* Edit Modal */}
@@ -388,14 +441,32 @@ const EditEmployeeModal: React.FC<{
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
+    // Ô nào chưa từng được lưu xuống CSDL — hiển thị 0 y hệt số 0 thật, nên phải
+    // đánh dấu cho Admin thấy. Chốt theo dữ liệu gốc, không theo formData, để nhãn
+    // không nhấp nháy khi đang gõ.
+    const isUnset = (parentField: 'commission_subtasks' | 'commission_stages', key: string) =>
+        !(employee[parentField] && Object.prototype.hasOwnProperty.call(employee[parentField], key));
+
     const handleNestedChange = (parentField: 'commission_subtasks' | 'commission_stages', key: string, value: number) => {
         setFormData(prev => ({
             ...prev,
             [parentField]: {
                 ...prev[parentField],
-                [key]: value
+                // Xoá trắng ô -> parseFloat('') = NaN -> lưu xuống thành JSON null,
+                // rồi SQL đọc ra NULL. Chặn tại đây, luôn ghi số.
+                [key]: Number.isFinite(value) ? value : 0
             }
         }));
+    };
+
+    // Ghi đủ mọi key, không chỉ ô Admin vừa gõ — nếu thiếu key thì báo cáo thưởng
+    // hiểu là "chưa cấu hình" và giao diện sẽ nói dối là 0.
+    const handleSubmit = () => {
+        onSave({
+            ...formData,
+            commission_stages: fillCommissionKeys(STAGE_COMMISSION_FIELDS, formData.commission_stages),
+            commission_subtasks: fillCommissionKeys(SUBTASK_COMMISSION_FIELDS, formData.commission_subtasks),
+        });
     };
 
     return (
@@ -538,19 +609,18 @@ const EditEmployeeModal: React.FC<{
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {[
-                                        { key: 'ThietKe', label: 'Thiết Kế' },
-                                        { key: 'InKhoLon', label: 'In Khổ Lớn' },
-                                        { key: 'BeDemi', label: 'Bế Demi' },
-                                        { key: 'GiaCongNgoai', label: 'Gia công ngoài' },
-                                        { key: 'EpKim', label: 'Ép Kim' },
-                                    ].map(item => (
+                                    {SUBTASK_COMMISSION_FIELDS.map(item => (
                                         <tr key={item.key} className="border-t">
-                                            <td className="px-3 py-2 font-medium">{item.label}</td>
+                                            <td className="px-3 py-2 font-medium">
+                                                {item.label}
+                                                {isUnset('commission_subtasks', item.key) && (
+                                                    <span className="ml-2 text-xs text-amber-600 italic font-normal">chưa cấu hình</span>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-2">
                                                 <input
                                                     type="number" step="0.1"
-                                                    className="w-full border rounded px-2 py-1 text-center focus:ring-1 focus:ring-blue-500"
+                                                    className={`w-full border rounded px-2 py-1 text-center focus:ring-1 focus:ring-blue-500 ${isUnset('commission_subtasks', item.key) ? 'border-amber-400 bg-amber-50' : ''}`}
                                                     value={formData.commission_subtasks?.[item.key] || 0}
                                                     onChange={e => handleNestedChange('commission_subtasks', item.key, parseFloat(e.target.value))}
                                                 />
@@ -573,21 +643,18 @@ const EditEmployeeModal: React.FC<{
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {[
-                                        { key: 'NhanFile', label: 'Nhận File' },
-                                        { key: 'XuLyFile', label: 'Xử lý File' },
-                                        { key: 'BinhFile', label: 'Bình File' },
-                                        { key: 'In', label: 'In ấn' },
-                                        { key: 'ThanhPham', label: 'Thành phẩm' },
-                                        { key: 'DongGoi', label: 'Đóng gói' },
-                                        { key: 'GiaoHang', label: 'Giao hàng' },
-                                    ].map(item => (
+                                    {STAGE_COMMISSION_FIELDS.map(item => (
                                         <tr key={item.key} className="border-t">
-                                            <td className="px-3 py-2 font-medium">{item.label}</td>
+                                            <td className="px-3 py-2 font-medium">
+                                                {item.label}
+                                                {isUnset('commission_stages', item.key) && (
+                                                    <span className="ml-2 text-xs text-amber-600 italic font-normal">chưa cấu hình</span>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-2">
                                                 <input
                                                     type="number" step="0.1"
-                                                    className="w-full border rounded px-2 py-1 text-center focus:ring-1 focus:ring-blue-500"
+                                                    className={`w-full border rounded px-2 py-1 text-center focus:ring-1 focus:ring-blue-500 ${isUnset('commission_stages', item.key) ? 'border-amber-400 bg-amber-50' : ''}`}
                                                     value={formData.commission_stages?.[item.key] || 0}
                                                     onChange={e => handleNestedChange('commission_stages', item.key, parseFloat(e.target.value))}
                                                 />
@@ -602,7 +669,7 @@ const EditEmployeeModal: React.FC<{
 
                 <div className="p-4 bg-gray-50 flex justify-end gap-3 border-t flex-shrink-0">
                     <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded font-medium">Hủy</button>
-                    <button onClick={() => onSave(formData)} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow-sm">
+                    <button onClick={handleSubmit} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow-sm">
                         Lưu thay đổi
                     </button>
                 </div>

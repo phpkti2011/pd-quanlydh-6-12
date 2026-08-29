@@ -67,3 +67,8 @@ __pycache__/
 .venv/
 venv/
 vendor/
+
+.vercel
+
+# File khoá tạm của Word/Excel khi đang mở tài liệu
+~$*

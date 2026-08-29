@@ -211,8 +211,12 @@ BEGIN
         SELECT
             p.full_name,
             COALESCE(p.competency_score, 1.0) AS score,
-            COALESCE((p.commission_stages->>part.stage)::NUMERIC, cp_proc.rate, 0) AS process_rate,
-            COALESCE((p.commission_subtasks->>part.stage)::NUMERIC, cp_sub.rate, 0) AS subtask_rate,
+            -- Không có key trong JSON  =>  0. KHÔNG lấy mức chung (commission_policies) nữa.
+            -- Lỗi cũ: COALESCE(..., cp_proc.rate, 0) khiến khâu "chưa cấu hình" âm thầm
+            -- ăn mức chung (VD: In = 20%) trong khi giao diện hiển thị 0.
+            -- ĐỪNG đưa fallback về mức chung trở lại — xem fix_stage_rate_no_fallback.sql.
+            COALESCE((p.commission_stages   ->> part.stage)::NUMERIC, 0) AS process_rate,
+            COALESCE((p.commission_subtasks ->> part.stage)::NUMERIC, 0) AS subtask_rate,
             part.stage,
             part.started_at,
             part.finished_at,
@@ -231,10 +235,8 @@ BEGIN
         FROM order_process_participants part
         JOIN orders   o ON part.order_id = o.id
         JOIN profiles p ON part.user_id  = p.id
-        LEFT JOIN commission_policies cp_proc
-               ON cp_proc.policy_type = 'MAINTASK_RATE' AND cp_proc.apply_to = part.stage
-        LEFT JOIN commission_policies cp_sub
-               ON cp_sub.policy_type  = 'SUBTASK_RATE'  AND cp_sub.apply_to  = part.stage
+        -- Đã bỏ 2 LEFT JOIN commission_policies (cp_proc / cp_sub): mức hoa hồng
+        -- nay chỉ lấy từ cấu hình riêng của từng nhân viên.
         WHERE o.status = 'HoanThanh'
         AND (
             (o.created_at::DATE < v_transition_date

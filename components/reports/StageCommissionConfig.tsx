@@ -124,6 +124,21 @@ export const StageCommissionConfig: React.FC = () => {
         <div className="p-4 bg-white rounded shadow-sm border border-gray-200">
             <h3 className="font-bold text-purple-700 mb-4 text-lg">Cấu hình % Hoa hồng</h3>
 
+            <div className="mb-4 p-3 bg-amber-50 text-amber-800 text-sm rounded border border-amber-300">
+                <div className="font-bold mb-1">
+                    <i className="fa-solid fa-triangle-exclamation mr-1"></i>
+                    Các mức ở đây KHÔNG còn được dùng để tính thưởng
+                </div>
+                Báo cáo Thưởng HHSX nay chỉ lấy % riêng của từng nhân viên
+                (Quản lý Nhân Viên → Chỉnh sửa → tab <b>Hoa hồng Quy trình</b> / <b>Hoa hồng Công đoạn</b>).
+                Khâu nào không điền cho nhân viên thì tính là <b>0</b>.
+                Trước đây khâu chưa cấu hình sẽ âm thầm lấy mức chung ở màn này, dẫn tới
+                trả thừa hoa hồng — đó là lý do cơ chế lấy mức chung đã bị bỏ.
+                Các mức ở đây đã được <b>sao chép một lần</b> sang cấu hình riêng của từng
+                nhân viên (Ép Kim, Đã giao hàng, Bế Demi); từ nay sửa ở màn này không còn
+                ảnh hưởng tới tiền thưởng nữa.
+            </div>
+
             <ConfigTable
                 title="1. Quy Trình Sản Xuất Chính (Gồm nhiều người)"
                 items={mainTaskPolicies}
