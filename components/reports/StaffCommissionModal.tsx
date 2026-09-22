@@ -59,6 +59,8 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
     const [resultsMonth, setResultsMonth] = useState(0);
     const [resultsYear, setResultsYear] = useState(0);
     const [tierSummary, setTierSummary] = useState<ProductionTierSummary | null>(null);
+    // Tháng này đang lấy mốc riêng hay mượn mốc chung
+    const [tierSource, setTierSource] = useState<'month' | 'global' | 'none'>('month');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -127,14 +129,16 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
         setLoading(true);
         setError(null);
         try {
-            const [data, summary] = await Promise.all([
+            const [data, summary, source] = await Promise.all([
                 commissionService.calculateStaffCommission(startDate, endDate, scope.filterName),
-                commissionService.getProductionCommissionSummary(selectedMonth, selectedYear)
+                commissionService.getProductionCommissionSummary(selectedMonth, selectedYear),
+                commissionService.getProductionTierSource(selectedMonth, selectedYear)
             ]);
             setResults(data);
             setResultsMonth(selectedMonth);
             setResultsYear(selectedYear);
             setTierSummary(summary);
+            setTierSource(source);
         } catch (err: any) {
             setError(err.message || 'Lỗi khi tính toán.');
         } finally {
@@ -328,24 +332,49 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                         {tierSummary.current_tier_pct === 0 && (
                                             <p className="text-xs font-medium">Chưa đạt mốc</p>
                                         )}
+                                        {/* Tháng này lấy mốc từ đâu — chỉ báo khi KHÔNG phải mốc riêng */}
+                                        {tierSource === 'global' && (
+                                            <p className="text-[11px] mt-1 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 inline-block">
+                                                <i className="fa-solid fa-globe mr-1"></i>Đang mượn mốc chung
+                                            </p>
+                                        )}
+                                        {tierSource === 'none' && (
+                                            <p className="text-[11px] mt-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-300 inline-block">
+                                                <i className="fa-solid fa-circle-exclamation mr-1"></i>Chưa cấu hình mốc
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 {/* All Tiers */}
-                                {tierSummary.all_tiers && tierSummary.all_tiers.length > 0 && (
+                                {tierSummary.all_tiers && tierSummary.all_tiers.length > 0 && (() => {
+                                    // Mốc áp dụng = mốc CAO NHẤT đã vượt qua (khớp get_production_tier_rate).
+                                    // Không dùng tier.max để chặn trên: cấu hình có khoảng trống thì
+                                    // sẽ không mốc nào sáng, trong khi thưởng vẫn được tính.
+                                    const sorted = [...tierSummary.all_tiers].sort((a: any, b: any) => a.min - b.min);
+                                    const activeMin = Math.max(
+                                        ...sorted.filter((t: any) => tierSummary.total_revenue >= t.min).map((t: any) => t.min),
+                                        -1
+                                    );
+                                    const lowestMin = sorted[0].min;
+                                    return (
                                     <div className="px-3 py-2">
                                         <p className="text-xs font-bold text-purple-700 mb-1.5">Các mốc thưởng hoa hồng sản xuất:</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {/* Below min = 0% */}
+                                            {/* Vùng "chưa đạt" chỉ tồn tại khi mốc thấp nhất > 0 */}
+                                            {lowestMin > 0 && (
                                             <span className={`text-xs px-2 py-1 rounded-full border ${
-                                                tierSummary.current_tier_pct === 0
+                                                tierSummary.total_revenue < lowestMin
                                                     ? 'bg-red-100 border-red-300 text-red-700 font-bold ring-2 ring-red-300'
                                                     : 'bg-gray-100 border-gray-200 text-gray-500'
                                             }`}>
-                                                &lt;{(Math.min(...tierSummary.all_tiers.map((t: any) => t.min)) / 1000000).toFixed(0)}tr: 0%
+                                                &lt;{(lowestMin / 1000000).toFixed(0)}tr: 0%
                                             </span>
-                                            {tierSummary.all_tiers.map((tier: any, idx: number) => {
-                                                const isActive = tierSummary.total_revenue >= tier.min && (tier.max === null || tierSummary.total_revenue < tier.max);
-                                                const maxLabel = tier.max ? `${(tier.max / 1000000).toFixed(0)}tr` : '∞';
+                                            )}
+                                            {sorted.map((tier: any, idx: number) => {
+                                                const isActive = tier.min === activeMin;
+                                                // Trần thật của mốc = "Từ" của mốc kế tiếp, không phải tier.max
+                                                const nextMin = sorted[idx + 1]?.min ?? null;
+                                                const maxLabel = nextMin !== null ? `${(nextMin / 1000000).toFixed(0)}tr` : '∞';
                                                 return (
                                                     <span key={idx} className={`text-xs px-2 py-1 rounded-full border ${
                                                         isActive
@@ -361,7 +390,8 @@ const StaffCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                             })}
                                         </div>
                                     </div>
-                                )}
+                                    );
+                                })()}
                             </div>
                         )}
 

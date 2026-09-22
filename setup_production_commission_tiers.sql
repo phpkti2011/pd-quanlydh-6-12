@@ -29,7 +29,9 @@ BEGIN
     FROM commission_policies
     WHERE policy_type = 'PRODUCTION_TIER'
     AND p_revenue >= threshold_min
-    AND (threshold_max IS NULL OR p_revenue < threshold_max)
+    -- KHÔNG chặn theo threshold_max: lấy mốc CAO NHẤT đã vượt qua.
+    -- Chặn trên khiến doanh số rơi vào khoảng trống giữa 2 mốc bị về 0%.
+    -- ĐỪNG đưa điều kiện đó quay lại. Xem fix_production_tier_gap.sql.
     ORDER BY threshold_min DESC
     LIMIT 1;
 

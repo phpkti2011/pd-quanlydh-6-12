@@ -918,9 +918,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                                     alert('Đơn hàng này chưa có mã theo dõi.');
                                 }
                             }}
-                            title="Lấy link theo dõi"
+                            title="Link theo dõi đơn hàng — sao chép để gửi khách tự tra cứu tình trạng"
                             disabled={isPaused}
-                            label="Lấy Link"
+                            label={"Link\ntheo dõi"}
                         />
 
 
@@ -1059,12 +1059,15 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
 // ... ActionButton helper ...
 // ... ActionButton helper ...
 const ActionButton = ({ icon, color, onClick, title, disabled, label }: { icon: string, color: string, onClick: () => void, title: string, disabled?: boolean, label?: string }) => {
-    const words = label ? label.split(' ') : [];
+    // Mặc định tách mỗi chữ một dòng. Nhãn nào cần tự chọn chỗ ngắt dòng
+    // (vd "Link\ntheo dõi") thì tách theo \n để không bị thành 3 dòng,
+    // khiến nút cao hơn các nút cạnh nó.
+    const words = label ? (label.includes('\n') ? label.split('\n') : label.split(' ')) : [];
     return (
         <button
             onClick={onClick}
             disabled={disabled}
-            className={`w-[42px] py-1 rounded-md flex flex-col items-center justify-center text-white shadow-sm transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
+            className={`min-w-[42px] px-1 py-1 rounded-md flex flex-col items-center justify-center text-white shadow-sm transition-all ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
             style={{ backgroundColor: color }}
             title={title}
         >

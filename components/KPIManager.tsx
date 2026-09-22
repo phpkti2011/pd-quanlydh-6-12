@@ -445,7 +445,13 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
     const [summary, setSummary] = useState<ProductionTierSummary | null>(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [editTiers, setEditTiers] = useState<{ id: string | null; threshold_min: number; threshold_max: number | null; rate: number }[]>([]);
+    // threshold_min / rate để null được: ô đang gõ dở có thể trống.
+    // Ép về 0 ngay lúc gõ sẽ khiến xoá trắng ô là số 0 nhảy vào, gõ không nổi.
+    // Chỉ quy null -> 0 lúc lưu.
+    const [editTiers, setEditTiers] = useState<{ id: string | null; threshold_min: number | null; threshold_max: number | null; rate: number | null }[]>([]);
+    // Tháng này đang lấy mốc riêng hay mượn mốc chung
+    const [tierSource, setTierSource] = useState<'month' | 'global' | 'none'>('month');
+    const [savingGlobal, setSavingGlobal] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -484,10 +490,12 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
     const loadData = async () => {
         setLoading(true);
         try {
-            const [tiersData, summaryData] = await Promise.all([
+            const [tiersData, summaryData, sourceData] = await Promise.all([
                 commissionService.getProductionTiers(month, year),
-                commissionService.getProductionCommissionSummary(month, year)
+                commissionService.getProductionCommissionSummary(month, year),
+                commissionService.getProductionTierSource(month, year)
             ]);
+            setTierSource(sourceData);
             setTiers(tiersData);
             setEditTiers(tiersData.map(t => ({
                 id: t.id,
@@ -519,25 +527,114 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
         setEditTiers(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
     };
 
+    /**
+     * "Đến" ĐÚNG RA của một mốc = "Từ" của mốc thấp nhất nằm cao hơn nó
+     * (mốc cao nhất = null, tức vô cực).
+     * Dùng cho nút "Tự điền cột Đến" và để phát hiện khoảng lệch.
+     */
+    const getTierMax = (min: number): number | null => {
+        const higher = editTiers
+            .map(t => t.threshold_min || 0)
+            .filter(v => v > min);
+        return higher.length > 0 ? Math.min(...higher) : null;
+    };
+
+    /** Điền cả cột "Đến" cho liền mạch, khỏi phải gõ tay từng ô. */
+    const autoFillTierMax = () => {
+        setEditTiers(prev => prev.map(t => ({
+            ...t,
+            threshold_max: getTierMax(t.threshold_min || 0)
+        })));
+    };
+
+    /**
+     * Các mốc có "Đến" lệch khỏi "Từ" của mốc kế tiếp.
+     * Sau fix_production_tier_gap.sql thì lệch KHÔNG làm mất thưởng nữa
+     * (hàm tính bỏ hẳn chặn trên), nhưng bảng sẽ hiển thị sai mức thực áp
+     * -> cảnh báo chứ không chặn Lưu.
+     */
+    const mismatchedTiers = editTiers.filter(t => {
+        const expected = getTierMax(t.threshold_min || 0);
+        return (t.threshold_max ?? null) !== expected;
+    });
+
+    /**
+     * Hỏi rồi gửi thông báo doanh số + mốc mới cho nhân viên sản xuất.
+     * Hỏi trước vì Admin có thể sửa nháp nhiều lần.
+     * Lỗi gửi KHÔNG được làm hỏng luồng lưu cấu hình -> nuốt lỗi, chỉ báo nhẹ.
+     */
+    const offerNotify = async (headline: string) => {
+        if (!window.confirm(
+            `Gửi thông báo mốc thưởng mới cho nhân viên sản xuất?\n\n` +
+            `Họ sẽ thấy doanh số tháng ${month}/${year} và bảng mốc mới ở chuông thông báo.`
+        )) return;
+
+        try {
+            const sent = await commissionService.notifyProductionRevenue(month, year, headline);
+            if (sent > 0) {
+                alert(`Đã gửi thông báo cho ${sent} nhân viên.`);
+            } else {
+                alert('Nội dung thông báo không đổi so với lần gửi gần đây, đã bỏ qua để tránh trùng.');
+            }
+        } catch (err: any) {
+            console.error('Notify production revenue error:', err);
+            alert('Đã lưu cấu hình, nhưng gửi thông báo lỗi: ' + err.message);
+        }
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
             await commissionService.saveProductionTiers(
-                editTiers.map(t => ({
-                    threshold_min: t.threshold_min || 0,
-                    threshold_max: t.threshold_max,
-                    rate: t.rate || 0
-                })),
+                [...editTiers]
+                    .sort((a, b) => (a.threshold_min || 0) - (b.threshold_min || 0))
+                    .map(t => ({
+                        threshold_min: t.threshold_min || 0,   // ô trống -> 0 ở bước lưu
+                        threshold_max: t.threshold_max ?? null, // trống = vô cực
+                        rate: t.rate || 0
+                    })),
                 month,
                 year
             );
             alert('Đã lưu cấu hình mốc thưởng sản xuất!');
             await loadData();
+            await offerNotify('Ban quản lý vừa cập nhật mốc thưởng hoa hồng sản xuất.');
         } catch (err: any) {
             console.error('Save production tiers error:', err);
             alert('Lỗi lưu: ' + err.message);
         }
         setSaving(false);
+    };
+
+    // Đặt bộ mốc đang có trên form làm MỐC CHUNG — lưới an toàn cho mọi tháng
+    // chưa cấu hình riêng.
+    const handleSaveGlobal = async () => {
+        if (!window.confirm(
+            `Đặt ${editTiers.length} mốc đang hiển thị làm MỐC CHUNG?\n\n` +
+            `Mốc chung được dùng cho MỌI tháng chưa cấu hình riêng.\n` +
+            `Bộ mốc chung cũ sẽ bị ghi đè.\n\n` +
+            `Mốc riêng của các tháng đã cấu hình KHÔNG bị ảnh hưởng.`
+        )) return;
+
+        setSavingGlobal(true);
+        try {
+            await commissionService.saveGlobalProductionTiers(
+                [...editTiers]
+                    .sort((a, b) => (a.threshold_min || 0) - (b.threshold_min || 0))
+                    .map(t => ({
+                        threshold_min: t.threshold_min || 0,   // ô trống -> 0 ở bước lưu
+                        threshold_max: t.threshold_max ?? null, // trống = vô cực
+                        rate: t.rate || 0
+                    }))
+            );
+            alert('Đã đặt làm mốc chung!');
+            await loadData();
+            await offerNotify('Ban quản lý vừa cập nhật mốc thưởng hoa hồng sản xuất.');
+        } catch (err: any) {
+            console.error('Save global production tiers error:', err);
+            alert('Lỗi lưu mốc chung: ' + err.message);
+        }
+        setSavingGlobal(false);
     };
 
     const getTierColor = (pct: number) => {
@@ -585,12 +682,44 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
                 Doanh số tính theo tổng đơn hoàn thành toàn công ty (chưa VAT).
             </div>
 
+            {/* Nguồn mốc: riêng của tháng hay mượn mốc chung */}
+            {tierSource === 'month' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+                    <i className="fa-solid fa-circle-check mr-2"></i>
+                    Tháng {month}/{year} <strong>đang dùng mốc riêng</strong> của tháng này.
+                </div>
+            )}
+            {tierSource === 'global' && (
+                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-sm text-yellow-800">
+                    <i className="fa-solid fa-triangle-exclamation mr-2"></i>
+                    Tháng {month}/{year} <strong>chưa cấu hình riêng — đang mượn mốc chung</strong>.
+                    Bấm <strong>Lưu Cấu Hình</strong> để chốt bộ mốc này thành mốc riêng của tháng.
+                </div>
+            )}
+            {tierSource === 'none' && (
+                <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-800">
+                    <i className="fa-solid fa-circle-exclamation mr-2"></i>
+                    <strong>Chưa có mốc nào, kể cả mốc chung.</strong> Mọi nhân viên sản xuất sẽ nhận
+                    0% thưởng tháng {month}/{year}. Hãy nhập mốc rồi bấm <strong>Lưu Cấu Hình</strong>.
+                </div>
+            )}
+
             {/* Tier Configuration Table */}
             <div className="flex justify-between items-center">
                 <h3 className="font-bold text-gray-700">Cấu hình mốc thưởng</h3>
-                <button onClick={addTier} className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium">
-                    <i className="fa-solid fa-plus mr-1"></i> Thêm mốc
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={autoFillTierMax}
+                        disabled={editTiers.length === 0}
+                        title="Điền cột Đến = Từ của mốc kế tiếp, cho bảng liền mạch"
+                        className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-100 text-sm font-medium disabled:opacity-40"
+                    >
+                        <i className="fa-solid fa-wand-magic-sparkles mr-1"></i> Tự điền cột Đến
+                    </button>
+                    <button onClick={addTier} className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium">
+                        <i className="fa-solid fa-plus mr-1"></i> Thêm mốc
+                    </button>
+                </div>
             </div>
 
             <div className="border rounded-lg overflow-hidden">
@@ -607,12 +736,19 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
                     <tbody className="divide-y">
                         {editTiers.map((tier, index) => (
                             <tr key={index} className="hover:bg-gray-50">
+                                {/* Cả 3 ô: value dùng `?? ''` để xoá trắng được khi đang gõ
+                                    (ép về 0 ngay lúc gõ sẽ chèn số 0 vào, gõ không nổi).
+                                    onWheel blur: input number bị đổi giá trị khi lăn chuột,
+                                    mà bảng này nằm trong modal có thanh cuộn -> cuộn trang
+                                    có thể âm thầm đổi mốc doanh số. */}
                                 <td className="px-4 py-2">
                                     <input
                                         type="number"
                                         className="w-full border rounded px-2 py-1.5 text-right focus:ring-2 focus:ring-orange-500 outline-none"
-                                        value={tier.threshold_min}
-                                        onChange={e => updateTier(index, 'threshold_min', parseFloat(e.target.value) || 0)}
+                                        value={tier.threshold_min ?? ''}
+                                        onWheel={e => e.currentTarget.blur()}
+                                        onChange={e => updateTier(index, 'threshold_min',
+                                            e.target.value === '' ? null : Number(e.target.value))}
                                     />
                                 </td>
                                 <td className="px-2 py-2 text-center text-gray-400"><i className="fa-solid fa-arrow-right"></i></td>
@@ -622,7 +758,9 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
                                         className="w-full border rounded px-2 py-1.5 text-right focus:ring-2 focus:ring-orange-500 outline-none"
                                         placeholder="∞ (không giới hạn)"
                                         value={tier.threshold_max ?? ''}
-                                        onChange={e => updateTier(index, 'threshold_max', e.target.value ? parseFloat(e.target.value) : null)}
+                                        onWheel={e => e.currentTarget.blur()}
+                                        onChange={e => updateTier(index, 'threshold_max',
+                                            e.target.value === '' ? null : Number(e.target.value))}
                                     />
                                 </td>
                                 <td className="px-4 py-2">
@@ -630,8 +768,10 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
                                         <input
                                             type="number" step="1"
                                             className="w-20 border rounded px-2 py-1.5 text-center font-bold text-orange-600 focus:ring-2 focus:ring-orange-500 outline-none"
-                                            value={tier.rate}
-                                            onChange={e => updateTier(index, 'rate', parseFloat(e.target.value) || 0)}
+                                            value={tier.rate ?? ''}
+                                            onWheel={e => e.currentTarget.blur()}
+                                            onChange={e => updateTier(index, 'rate',
+                                                e.target.value === '' ? null : Number(e.target.value))}
                                         />
                                         <span className="text-gray-500 font-bold">%</span>
                                     </div>
@@ -652,22 +792,56 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
                 </table>
             </div>
 
+            {/* Cảnh báo cột "Đến" lệch — KHÔNG chặn Lưu */}
+            {mismatchedTiers.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-sm text-yellow-800">
+                    <div className="font-bold mb-1">
+                        <i className="fa-solid fa-triangle-exclamation mr-2"></i>
+                        Cột "Đến" đang lệch ở {mismatchedTiers.length} mốc
+                    </div>
+                    <ul className="list-disc list-inside mb-1">
+                        {mismatchedTiers.map((t, i) => (
+                            <li key={i}>
+                                Mốc từ <strong>{(t.threshold_min || 0).toLocaleString('vi-VN')}</strong> ghi đến{' '}
+                                <strong>{t.threshold_max?.toLocaleString('vi-VN') ?? '∞'}</strong>, nhưng thực tế áp tới{' '}
+                                <strong>{getTierMax(t.threshold_min || 0)?.toLocaleString('vi-VN') ?? '∞'}</strong>
+                            </li>
+                        ))}
+                    </ul>
+                    Cột "Đến" chỉ để hiển thị. Mức thực tế được áp là <strong>mốc cao nhất đã vượt qua</strong>.
+                    Bấm <strong>Tự điền cột Đến</strong> để cho khớp.
+                </div>
+            )}
+
             {/* Note about below min threshold */}
             <p className="text-xs text-gray-500 italic">
-                * Doanh số dưới mốc thấp nhất ({editTiers.length > 0 ? formatMoney(Math.min(...editTiers.map(t => t.threshold_min))) : '—'}) sẽ nhận 0% thưởng hoa hồng sản xuất.
+                * Doanh số dưới mốc thấp nhất ({editTiers.length > 0 ? formatMoney(Math.min(...editTiers.map(t => t.threshold_min || 0))) : '—'}) sẽ nhận 0% thưởng hoa hồng sản xuất.
             </p>
 
             {/* Save Button */}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+                <button
+                    onClick={handleSaveGlobal}
+                    disabled={savingGlobal || saving || editTiers.length === 0}
+                    title="Dùng bộ mốc này cho mọi tháng chưa cấu hình riêng"
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded font-medium hover:bg-gray-100 disabled:opacity-40 flex items-center gap-2"
+                >
+                    {savingGlobal && <i className="fa-solid fa-spinner fa-spin"></i>}
+                    <i className="fa-solid fa-globe"></i>
+                    Đặt làm mốc chung
+                </button>
                 <button
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || savingGlobal}
                     className="px-6 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700 shadow-sm disabled:bg-gray-400 flex items-center gap-2"
                 >
                     {saving && <i className="fa-solid fa-spinner fa-spin"></i>}
                     Lưu Mốc Thưởng Sản Xuất
                 </button>
             </div>
+            <p className="text-xs text-gray-500 italic text-right">
+                <strong>Mốc chung</strong> là lưới an toàn: tháng nào chưa cấu hình riêng sẽ tự dùng bộ mốc chung này.
+            </p>
         </div>
     );
 };

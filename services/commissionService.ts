@@ -220,6 +220,69 @@ export const commissionService = {
     },
 
     /**
+     * Lưu bộ mốc CHUNG (period_month IS NULL) — lưới an toàn cho mọi tháng
+     * chưa cấu hình riêng. Chỉ Admin (hàm SQL tự chặn).
+     * Xem fix_production_global_tiers.sql
+     */
+    async saveGlobalProductionTiers(
+        tiers: { threshold_min: number; threshold_max: number | null; rate: number }[]
+    ) {
+        const payload = tiers.map(t => ({
+            min: t.threshold_min,
+            max: t.threshold_max,
+            rate: t.rate
+        }));
+        const { error } = await supabase.rpc('save_global_production_tiers', {
+            p_tiers: JSON.stringify(payload)
+        });
+        if (error) throw error;
+    },
+
+    /**
+     * Gửi thông báo doanh số + mốc thưởng cho nhân viên sản xuất.
+     * Nội dung do SQL dựng (build_production_revenue_message) — dùng chung với
+     * cron 7h sáng và trigger tự báo khi vượt mốc, để không có 2 bản lệch nhau.
+     * Trả về số người đã nhận (0 nếu bị chặn gửi trùng trong 10 phút).
+     * Xem setup_production_revenue_notify.sql
+     */
+    async notifyProductionRevenue(month: number, year: number, headline?: string): Promise<number> {
+        const { data, error } = await supabase.rpc('notify_production_revenue', {
+            p_month: month,
+            p_year: year,
+            p_headline: headline ?? null,
+            p_require_admin: true
+        });
+        if (error) throw error;
+        return (data as number) ?? 0;
+    },
+
+    /**
+     * Tháng này đang lấy mốc từ đâu? Khớp đúng thứ tự ưu tiên của
+     * get_production_tier_rate: mốc riêng của tháng trước, không có thì mốc chung.
+     *   'month'  - có mốc riêng của tháng
+     *   'global' - đang mượn mốc chung
+     *   'none'   - không có mốc nào -> mọi người nhận 0%
+     */
+    async getProductionTierSource(month: number, year: number): Promise<'month' | 'global' | 'none'> {
+        const { count: monthCount } = await supabase
+            .from('commission_policies')
+            .select('id', { count: 'exact', head: true })
+            .eq('policy_type', 'PRODUCTION_TIER')
+            .eq('period_month', month)
+            .eq('period_year', year);
+
+        if ((monthCount || 0) > 0) return 'month';
+
+        const { count: globalCount } = await supabase
+            .from('commission_policies')
+            .select('id', { count: 'exact', head: true })
+            .eq('policy_type', 'PRODUCTION_TIER')
+            .is('period_month', null);
+
+        return (globalCount || 0) > 0 ? 'global' : 'none';
+    },
+
+    /**
      * Get Production Commission Summary (for display & notifications)
      */
     async getProductionCommissionSummary(month: number, year: number): Promise<ProductionTierSummary | null> {

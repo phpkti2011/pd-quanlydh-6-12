@@ -80,7 +80,12 @@ BEGIN
          OR (NOT v_has_month AND period_month IS NULL)
           )
       AND p_revenue >= threshold_min
-      AND (threshold_max IS NULL OR p_revenue < threshold_max)
+      -- KHÔNG chặn theo threshold_max: lấy mốc CAO NHẤT đã vượt qua.
+      -- Bản cũ có thêm `AND (threshold_max IS NULL OR p_revenue < threshold_max)`
+      -- khiến doanh số rơi vào khoảng trống giữa 2 mốc bị trả về 0%.
+      -- VD mốc "0-580tr: 40%" và "620-660tr: 70%", doanh số 591tr không khớp
+      -- mốc nào -> cả xưởng mất sạch thưởng dù bán nhiều hơn tháng trước.
+      -- ĐỪNG đưa điều kiện đó quay lại. Xem fix_production_tier_gap.sql.
     ORDER BY threshold_min DESC
     LIMIT 1;
 
