@@ -208,6 +208,13 @@ CREATE TABLE IF NOT EXISTS production_tier_notify_state (
     PRIMARY KEY (period_month, period_year)
 );
 
+-- CỐ Ý KHÔNG GRANT cho bảng này (khác với mẫu _TEMPLATE_tao_bang_moi.sql):
+-- chỉ trigger notify_production_tier_change (SECURITY DEFINER) đọc/ghi, phần
+-- mềm không bao giờ gọi supabase.from('production_tier_notify_state').
+-- Cấp quyền là thừa. Bật RLS mà không tạo policy để khoá hẳn phía client;
+-- trigger chạy dưới quyền chủ sở hữu bảng nên không bị RLS chặn.
+ALTER TABLE production_tier_notify_state ENABLE ROW LEVEL SECURITY;
+
 CREATE OR REPLACE FUNCTION notify_production_tier_change()
 RETURNS TRIGGER AS $$
 DECLARE
