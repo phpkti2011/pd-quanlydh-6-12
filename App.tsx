@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDebounce } from './hooks/useDebounce';
-import { COLORS } from './constants';
-import { orderService } from './services/orderService';
+import { COLORS, REWORK_TAB } from './constants';
+import { orderService, buildReworkDraft } from './services/orderService';
 import { supabase } from './services/supabaseClient';
 import { authService } from './services/auth';
 import { dashboardService } from './services/dashboardService';
@@ -30,6 +30,7 @@ import CollectionReportModal from './components/reports/CollectionReportModal';
 import ActivityLogModal from './components/reports/ActivityLogModal';
 import CustomerReportModal from './components/reports/CustomerReportModal';
 import CustomerRevenueModal from './components/reports/CustomerRevenueModal';
+import ReworkReportModal from './components/reports/ReworkReportModal';
 import TrackingPage from './components/TrackingPage';
 
 import { AISettingsModal } from './components/AISettingsModal';
@@ -66,6 +67,10 @@ const App: React.FC = () => {
   // Modals State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  // Đang tạo đơn sản xuất lại cho đơn gốc nào (null = tạo/sửa đơn thường).
+  // nextCode chỉ để hiện trước trong form; mã thật do trigger CSDL sinh khi lưu.
+  const [reworkOf, setReworkOf] = useState<{ id: string; order_code: string; nextCode: string } | null>(null);
+  const [isReworkReportOpen, setIsReworkReportOpen] = useState(false);
   const [isCustomerManagerOpen, setIsCustomerManagerOpen] = useState(false);
   const [isFinancialReportOpen, setIsFinancialReportOpen] = useState(false);
   const [isSalesCommOpen, setIsSalesCommOpen] = useState(false);
@@ -213,28 +218,33 @@ const App: React.FC = () => {
       // 2. Fetch Lightweight Statuses for Tab Counts (filtered by same month)
       const allStatusData = await orderService.getAllOrderStatuses(orderMonth, orderYear);
 
+      // Đơn sản xuất lại chỉ đếm ở tab riêng; mọi tab trạng thái / công đoạn đếm đơn thường
+      const normalOrders = allStatusData.filter((o: any) => !o.rework_of_order_id);
       const newTabCounts: Record<string, number> = {
         all: allStatusData.length,
-        xuat_hoa_don: allStatusData.filter((o: any) => o.vat_amount > 0 && o.status !== 'Huy').length,
-        nhan_file: allStatusData.filter((o: any) => ['Moi', 'TiepNhan', 'NhanFile'].includes(o.status)).length,
-        xu_ly_file: allStatusData.filter((o: any) => o.status === 'XuLyFile').length,
-        binh_file: allStatusData.filter((o: any) => o.status === 'BinhFile').length,
-        in: allStatusData.filter((o: any) => o.status === 'In').length,
-        thanh_pham: allStatusData.filter((o: any) => o.status === 'ThanhPham').length,
-        dong_goi: allStatusData.filter((o: any) => o.status === 'DongGoi').length,
-        cho_giao_hang: allStatusData.filter((o: any) => o.status === 'ChoGiaoHang').length,
-        da_giao_hang: allStatusData.filter((o: any) => o.status === 'DaGiaoHang').length,
-        hoan_thanh: allStatusData.filter((o: any) => o.status === 'HoanThanh').length,
-        gap: allStatusData.filter((o: any) => o.is_urgent && o.status !== 'Huy' && o.status !== 'HoanThanh').length,
-        huy: allStatusData.filter((o: any) => o.status === 'Huy').length,
-        tam_ngung: allStatusData.filter((o: any) => o.status === 'TamNgung').length,
+        xuat_hoa_don: normalOrders.filter((o: any) => o.vat_amount > 0 && o.status !== 'Huy').length,
+        nhan_file: normalOrders.filter((o: any) => ['Moi', 'TiepNhan', 'NhanFile'].includes(o.status)).length,
+        xu_ly_file: normalOrders.filter((o: any) => o.status === 'XuLyFile').length,
+        binh_file: normalOrders.filter((o: any) => o.status === 'BinhFile').length,
+        in: normalOrders.filter((o: any) => o.status === 'In').length,
+        thanh_pham: normalOrders.filter((o: any) => o.status === 'ThanhPham').length,
+        dong_goi: normalOrders.filter((o: any) => o.status === 'DongGoi').length,
+        cho_giao_hang: normalOrders.filter((o: any) => o.status === 'ChoGiaoHang').length,
+        da_giao_hang: normalOrders.filter((o: any) => o.status === 'DaGiaoHang').length,
+        hoan_thanh: normalOrders.filter((o: any) => o.status === 'HoanThanh').length,
+        gap: normalOrders.filter((o: any) => o.is_urgent && o.status !== 'Huy' && o.status !== 'HoanThanh').length,
+        huy: normalOrders.filter((o: any) => o.status === 'Huy').length,
+        tam_ngung: normalOrders.filter((o: any) => o.status === 'TamNgung').length,
 
         // Task Counts
-        thiet_ke: allStatusData.filter((o: any) => o.has_design).length,
-        in_kho_lon: allStatusData.filter((o: any) => o.has_large_print).length,
-        be_demi: allStatusData.filter((o: any) => o.has_be_demi).length,
-        gia_cong_ngoai: allStatusData.filter((o: any) => o.has_gia_cong_ngoai).length,
-        ep_kim: allStatusData.filter((o: any) => o.has_ep_kim).length,
+        thiet_ke: normalOrders.filter((o: any) => o.has_design).length,
+        in_kho_lon: normalOrders.filter((o: any) => o.has_large_print).length,
+        be_demi: normalOrders.filter((o: any) => o.has_be_demi).length,
+        gia_cong_ngoai: normalOrders.filter((o: any) => o.has_gia_cong_ngoai).length,
+        ep_kim: normalOrders.filter((o: any) => o.has_ep_kim).length,
+
+        // Đơn sản xuất lại đang làm (chưa xong, chưa hủy)
+        san_xuat_lai: allStatusData.filter((o: any) => o.rework_of_order_id && o.status !== 'HoanThanh' && o.status !== 'Huy').length,
       };
       setTabCounts(newTabCounts);
 
@@ -265,6 +275,7 @@ const App: React.FC = () => {
     // Logic:
     // If 'Xuất hóa đơn', default 'Chưa xuất'
     if (currentTab === 'Xuất hóa đơn') setCurrentSubTab('Chưa xuất');
+    if (currentTab === REWORK_TAB) setCurrentSubTab('Chưa xong');
 
     const taskTabs = ['Thiết Kế', 'In Khổ Lớn', 'Bế Demi', 'Gia công ngoài', 'Ép Kim'];
     const normalizedTab = currentTab.normalize('NFC');
@@ -276,26 +287,59 @@ const App: React.FC = () => {
 
   const handleCreateOrder = () => {
     setEditingOrder(null);
+    setReworkOf(null);
     setIsModalOpen(true);
   };
 
   const handleEditOrder = (order: Order) => {
     setEditingOrder(order);
+    setReworkOf(null);
     setIsModalOpen(true);
   };
 
+  // Tạo đơn sản xuất lại từ một đơn bị lỗi (xem setup_rework_orders.sql).
+  // Treo vào đơn GỐC tận cùng: bấm trên đơn -L1 thì vẫn ra -L2 của gốc. Tải lại
+  // gốc để biết đã có bao nhiêu đơn -L (mã dự kiến hiện trong form; mã thật do
+  // trigger CSDL sinh khi lưu). Nội dung chép từ đơn đang xem.
+  const handleRework = async (order: Order) => {
+    try {
+      const rootId = order.rework_of_order_id || order.id;
+      const root = await orderService.getById(rootId);
+      const nextCode = `${root.order_code}-L${(root.reworks?.length || 0) + 1}`;
+      setEditingOrder(buildReworkDraft(order, root) as Order);
+      setReworkOf({ id: root.id, order_code: root.order_code, nextCode });
+      setIsModalOpen(true);
+    } catch (e) {
+      alert('Không tải được đơn gốc: ' + (e as Error).message);
+    }
+  };
+
   const handleSubmitOrder = async (orderData: Partial<Order>) => {
+    // Bản nháp đơn sản xuất lại không có id -> luôn là tạo mới
+    const isCreating = !editingOrder?.id || !!reworkOf;
+
     // Auto-assign Sales Rep ID for new orders if user is NhanVienKinhDoanh
-    if (!editingOrder?.id && userRole === 'NhanVienKinhDoanh' && session?.user?.id) {
+    // (đơn sản xuất lại giữ NVKD của đơn gốc; chỉ gán khi gốc không có)
+    if (isCreating && userRole === 'NhanVienKinhDoanh' && session?.user?.id && (!reworkOf || !orderData.sales_rep_id)) {
       orderData.sales_rep_id = session.user.id;
     }
 
-    if (editingOrder?.id) {
-      await orderService.updateOrder(editingOrder.id, orderData);
-    } else {
-      await orderService.createOrder(orderData);
+    try {
+      if (!isCreating) {
+        await orderService.updateOrder(editingOrder!.id, orderData);
+      } else {
+        await orderService.createOrder(orderData);
+      }
+    } catch (e: any) {
+      // 23505 = trùng UNIQUE(order_code): hai người tạo đơn làm lại cùng lúc
+      const msg = e?.code === '23505'
+        ? 'Mã đơn vừa bị trùng (có người tạo cùng lúc). Vui lòng bấm Lưu lại.'
+        : (e?.message || 'Lỗi không rõ');
+      alert('Không lưu được đơn hàng: ' + msg);
+      return;
     }
     setIsModalOpen(false);
+    setReworkOf(null);
     refreshOrders(); // Use shared refresh
   };
 
@@ -310,6 +354,7 @@ const App: React.FC = () => {
     // { label: "Xuất Toàn bộ Thưởng", icon: "fa-file-excel", color: COLORS.btnExportBonus, onClick: () => alert("Tính năng Xuất thưởng đang phát triển"), roles: ['Admin', 'KeToan'] },
     { label: "BC Hoạt động", icon: "fa-chart-pie", color: COLORS.btnActivityReport, onClick: () => setIsActivityReportOpen(true), roles: ['Admin', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'KeToan'] },
     { label: "Lịch sử HĐ", icon: "fa-history", color: "#607d8b", onClick: () => setIsActivityLogOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat'] },
+    { label: "BC SX lại", icon: "fa-rotate", color: "#e65100", onClick: () => setIsReworkReportOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat'] },
     { label: "Báo cáo TC", icon: "fa-cash-register", color: COLORS.btnFinanceReport, onClick: () => setIsFinancialReportOpen(true), roles: ['Admin', 'KeToan'] },
     { label: "Thống kê HS", icon: "fa-person-digging", color: COLORS.btnWorkStats, onClick: () => setIsPerformanceStatsOpen(true), roles: ['Admin', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile'] }, // Allowed for production staff to see own stats
     { label: "Đánh giá NVKD", icon: "fa-chart-line", color: COLORS.btnEvalSales, onClick: () => setIsSalesEvalOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
@@ -364,6 +409,17 @@ const App: React.FC = () => {
       }
 
       const normalizedTab = currentTab.normalize('NFC');
+
+      // Đơn sản xuất lại: chỉ hiện ở tab riêng và "Tất cả" (khi đang làm).
+      // Chúng chép cờ has_* từ đơn gốc nên phải chặn TRƯỚC khi tới các tab công đoạn.
+      if (normalizedTab === REWORK_TAB.normalize('NFC')) {
+        if (!order.rework_of_order_id) return false;
+        const done = order.status === 'HoanThanh' || order.status === 'Huy';
+        if (currentSubTab === 'Đã xong') return done;
+        if (currentSubTab === 'Chưa xong') return !done;
+        return true;
+      }
+      if (order.rework_of_order_id && normalizedTab !== 'Tất cả') return false;
 
       // Explicitly handle 'Tất cả' to show ONLY ACTIVE orders (Exclude HoanThanh, DaGiaoHang, Huy)
       if (normalizedTab === 'Tất cả') {
@@ -499,7 +555,12 @@ const App: React.FC = () => {
       counts['Đã hoàn thành'] = relevant.filter(o => isTaskCompleted(o.ep_kim_status, o.status)).length;
     }
 
-    return counts;
+    if (normalizedTab === REWORK_TAB.normalize('NFC')) {
+      const relevant = orders.filter(o => o.rework_of_order_id);
+      const isDone = (o: Order) => o.status === 'HoanThanh' || o.status === 'Huy';
+      counts['Chưa xong'] = relevant.filter(o => !isDone(o)).length;
+      counts['Đã xong'] = relevant.filter(isDone).length;
+    }
 
     return counts;
   }, [orders, currentTab]);
@@ -515,6 +576,13 @@ const App: React.FC = () => {
   const handleViewHistory = (orderCode: string) => {
     setHistoryOrderCode(orderCode);
     setIsActivityLogOpen(true);
+  };
+
+  // Mở đơn gốc / đơn làm lại từ chip liên kết: tìm theo mã (tìm kiếm bỏ qua
+  // lọc tab). Gõ mã gốc sẽ thấy cả gốc lẫn các đơn -L của nó — đúng ý "theo dõi".
+  const handleOpenOrder = (ref: { id: string; order_code: string }) => {
+    if (currentTab === '📊 Tổng quan') setCurrentTab('Tất cả');
+    setSearchTerm(ref.order_code);
   };
 
   return (
@@ -789,6 +857,7 @@ const App: React.FC = () => {
               <Dashboard
                 currentUser={{ ...session?.user, role: userRole }}
                 onEditOrder={handleEditOrder}
+                onReworkOrder={handleRework}
               />
             ) : (
               // Order List View (For all other tabs)
@@ -803,6 +872,8 @@ const App: React.FC = () => {
                         onRefresh={refreshOrders}
                         currentUser={{ ...session?.user, role: userRole }}
                         onViewHistory={handleViewHistory}
+                        onRework={handleRework}
+                        onOpenOrder={handleOpenOrder}
                       />
                     ))}
                     {filteredOrders.length === 0 && <p className="col-span-full text-center text-gray-500 py-10 bg-white rounded-lg border border-gray-200 shadow-sm">Không có đơn hàng nào trong mục này.</p>}
@@ -816,6 +887,8 @@ const App: React.FC = () => {
                     tabCounts={tabCounts}
                     currentTab={currentTab}
                     onViewHistory={handleViewHistory}
+                    onRework={handleRework}
+                    onOpenOrder={handleOpenOrder}
                   />
                 )}
               </>
@@ -859,11 +932,12 @@ const App: React.FC = () => {
       {/* Modals */}
       <OrderModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setReworkOf(null); }}
         onSubmit={handleSubmitOrder}
         initialData={editingOrder}
         userRole={userRole as any}
         currentUserId={session?.user?.id}
+        reworkOf={reworkOf}
       />
 
       {
@@ -960,6 +1034,12 @@ const App: React.FC = () => {
       <CustomerRevenueModal
         isOpen={isCustomerRevenueOpen}
         onClose={() => setIsCustomerRevenueOpen(false)}
+      />
+
+      <ReworkReportModal
+        isOpen={isReworkReportOpen}
+        onClose={() => setIsReworkReportOpen(false)}
+        onOpenOrder={(ref) => { setIsReworkReportOpen(false); handleOpenOrder(ref); }}
       />
 
       <AISettingsModal

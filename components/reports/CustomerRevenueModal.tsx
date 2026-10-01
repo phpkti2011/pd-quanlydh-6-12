@@ -68,6 +68,7 @@ const CustomerRevenueModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
     const [orders, setOrders] = useState<RevenueOrder[]>([]);
     const [cancelledCount, setCancelledCount] = useState(0);
+    const [reworkCount, setReworkCount] = useState(0);
     const [truncated, setTruncated] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -79,7 +80,7 @@ const CustomerRevenueModal: React.FC<Props> = ({ isOpen, onClose }) => {
             const { start, end } = getMonthRange(selectedMonth, selectedYear);
             const { data, error: err } = await supabase
                 .from('orders')
-                .select('id, order_code, description, total_amount, total_amount_pre_vat, deposit_amount, payment_status, status, created_at, customer:customer_id(id, code, name), sales_rep:sales_rep_id(full_name)')
+                .select('id, order_code, description, total_amount, total_amount_pre_vat, deposit_amount, payment_status, status, created_at, rework_of_order_id, customer:customer_id(id, code, name), sales_rep:sales_rep_id(full_name)')
                 .gte('created_at', start.toISOString())
                 .lte('created_at', end.toISOString())
                 .order('created_at', { ascending: false })
@@ -93,9 +94,11 @@ const CustomerRevenueModal: React.FC<Props> = ({ isOpen, onClose }) => {
             // Đơn Hủy không tính vào doanh số (cùng quy ước với customerService.getCustomerReportData)
             const cancelled = rows.filter((o: any) => o.status === 'Huy');
             setCancelledCount(cancelled.length);
+            // Đơn sản xuất lại không phải đơn mua của khách (0đ) — loại khỏi bảng này
+            setReworkCount(rows.filter((o: any) => o.rework_of_order_id && o.status !== 'Huy').length);
 
             const mapped: RevenueOrder[] = rows
-                .filter((o: any) => o.status !== 'Huy')
+                .filter((o: any) => o.status !== 'Huy' && !o.rework_of_order_id)
                 .map((o: any) => {
                     const { total, collected, debt } = computeMoney(o);
                     return {
@@ -384,6 +387,11 @@ const CustomerRevenueModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     {cancelledCount > 0 && (
                         <span className="text-orange-600">
                             Đã loại {cancelledCount} đơn Hủy khỏi số liệu
+                        </span>
+                    )}
+                    {reworkCount > 0 && (
+                        <span className="text-orange-600">
+                            Đã loại {reworkCount} đơn sản xuất lại (không tính doanh số khách)
                         </span>
                     )}
                     {selectedCustomer && (

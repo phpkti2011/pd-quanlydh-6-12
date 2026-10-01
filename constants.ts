@@ -61,6 +61,10 @@ export const LEGACY_STATUS_TABS = [
 
 export const TASK_TABS = ["Thiết Kế", "In Khổ Lớn", "Bế Demi", "Gia công ngoài", "Ép Kim"];
 
+// Tab riêng cho đơn sản xuất lại (làm lại đơn bị lỗi) — dùng chung ở
+// StatusTabs, App.tsx và orderService để không gõ lệch nhãn.
+export const REWORK_TAB = "🔁 Sản xuất lại";
+
 export const COLORS = {
   primary: "#00796b",
   primaryDark: "#005a4f",

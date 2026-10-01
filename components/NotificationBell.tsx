@@ -108,7 +108,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ userId, onOp
     }
     // Trích mã đơn hàng từ message (vd: "26PD2703.0549")
     if (onOpenOrder) {
-      const match = notif.message?.match(/\d{2}PD\d{4}\.\d{4}/);
+      // Mã đơn sản xuất lại có đuôi -L1, -L2… phải bắt luôn, kẻo mở nhầm đơn gốc
+      const match = notif.message?.match(/\d{2}PD\d{4}\.\d{4}(?:-L\d+)?/);
       if (match) {
         onOpenOrder(match[0]);
         setIsOpen(false);

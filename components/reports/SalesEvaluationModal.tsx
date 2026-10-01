@@ -57,7 +57,7 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             // 1. Fetch All Required Data (Orders, Policies, Profiles, Customers, Target)
             const ordersPromise = supabase
                 .from('orders')
-                .select('id, sales_rep_id, total_amount, status, created_at')
+                .select('id, sales_rep_id, total_amount, status, created_at, rework_of_order_id')
                 .gte('created_at', `${start}T00:00:00`)
                 .lte('created_at', `${end}T23:59:59`);
 
@@ -130,6 +130,8 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             // Process Orders
             orders.forEach(o => {
                 if (!o.sales_rep_id) return;
+                // Đơn sản xuất lại không tính số đơn / doanh số NVKD
+                if ((o as any).rework_of_order_id) return;
                 // Init if not exists
                 if (!repStats[o.sales_rep_id]) {
                     repStats[o.sales_rep_id] = { total_sales: 0, valid_orders_count: 0, max_val: 0, active_days: new Set(), new_cust_count: 0, total_created_count: 0 };

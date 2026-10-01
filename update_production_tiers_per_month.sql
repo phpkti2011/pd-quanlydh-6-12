@@ -113,26 +113,14 @@ DECLARE
     v_next_threshold NUMERIC;
     v_next_pct NUMERIC;
     v_has_month BOOLEAN;
-    v_transition_date DATE := '2026-03-01';
 BEGIN
     v_start := make_date(p_year, p_month, 1);
     v_end := (v_start + interval '1 month' - interval '1 day')::DATE;
 
-    -- Doanh thu tháng (chưa VAT), cùng logic transition với calculate_staff_commission
-    SELECT COALESCE(SUM(total_amount_pre_vat), 0)
-    INTO v_revenue
-    FROM orders
-    WHERE status = 'HoanThanh'
-    AND (
-        (created_at::DATE < v_transition_date
-         AND created_at::DATE >= v_start
-         AND created_at::DATE <= v_end)
-        OR
-        (created_at::DATE >= v_transition_date
-         AND completed_at IS NOT NULL
-         AND completed_at::DATE >= v_start
-         AND completed_at::DATE <= v_end)
-    );
+    -- Doanh thu tháng (chưa VAT, đã trừ chi phí sản xuất lại) — một hàm dùng chung
+    -- với get_staff_commission_rows, xem setup_rework_orders.sql. ĐỪNG chép lại
+    -- đoạn SUM ở đây: hai nơi tự tính là hai nơi lệch số.
+    v_revenue := production_revenue_in_period(v_start, v_end);
 
     -- Có mốc riêng cho tháng này không?
     SELECT EXISTS(

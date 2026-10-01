@@ -211,6 +211,12 @@ const DailyReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                     <KpiCard label="Doanh thu tháng (có VAT)" value={fmtMoneyShort(data.revenue_month_total)} color="purple" sub={fmtMoney(data.revenue_month_total)} />
                                     <KpiCard label="Doanh thu tháng (chưa VAT)" value={fmtMoneyShort(data.revenue_month_pre_vat)} color="orange" sub={fmtMoney(data.revenue_month_pre_vat)} />
                                 </div>
+                                {(data.rework_count_month || 0) > 0 && (
+                                    <div className="mb-4 p-3 rounded-lg bg-orange-50 border border-orange-200 text-sm text-orange-900">
+                                        <i className="fa-solid fa-rotate mr-1"></i>
+                                        Tháng này có <b>{data.rework_count_month}</b> đơn sản xuất lại, chi phí <b>{fmtMoney(data.rework_cost_month || 0)}</b> — đã trừ khỏi doanh thu tháng ở trên.
+                                    </div>
+                                )}
 
                                 {/* Line chart 7 ngày */}
                                 {trendChartData.length > 0 && (

@@ -21,14 +21,18 @@ interface OrderCardProps {
     onRefresh: () => void;
     currentUser: any;
     onViewHistory?: (orderCode: string) => void; // NEW
+    /** Tạo đơn sản xuất lại từ đơn này (xem setup_rework_orders.sql) */
+    onRework?: (order: Order) => void;
+    /** Mở đơn gốc / đơn làm lại được liên kết */
+    onOpenOrder?: (ref: { id: string; order_code: string }) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, currentUser, onViewHistory }) => {
+const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, currentUser, onViewHistory, onRework, onOpenOrder }) => {
     const [showInvoiceInfo, setShowInvoiceInfo] = useState(false);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
     const isUrgent = order.is_urgent;
-    const borderColor = isUrgent ? COLORS.warning : COLORS.primary;
+    const borderColor = isUrgent ? COLORS.warning : (order.rework_of_order_id ? '#e65100' : COLORS.primary);
 
     // Role Barriers (Strict)
     const canEditDetails = ['Admin', 'NhanVienKinhDoanh'].includes(currentUser?.role); // Removed 'KeToan'
@@ -42,6 +46,10 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
     // Đưa đơn ra khỏi trạng thái Hoàn thành sẽ xoá completed_at (xem
     // setup_step5_completed_at.sql), khiến đơn rơi khỏi doanh số của tháng.
     const canUndoComplete = ['Admin', 'admin'].includes(currentUser?.role);
+    // Đơn sản xuất lại (xem setup_rework_orders.sql): không công đoạn, không
+    // thanh toán, không hoa hồng — thẻ rút gọn, chỉ còn Hoàn thành / Hủy.
+    const isRework = !!order.rework_of_order_id;
+    const canRework = ['Admin', 'QuanLySanXuat', 'NhanVienKinhDoanh'].includes(currentUser?.role);
 
     const [editingField, setEditingField] = React.useState<{ field: keyof Order | 'payment_note', title: string, value: string } | null>(null);
     const [showPaymentConfirmModal, setShowPaymentConfirmModal] = React.useState(false);
@@ -149,7 +157,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                     await orderService.updateStatus(order.id, 'HoanThanh');
                     break;
                 case "Hoàn tác": // NEW: Undo Complete
-                    await orderService.updateStatus(order.id, 'DaGiaoHang');
+                    // Đơn làm lại không đi qua Đã giao hàng -> quay về Mới
+                    await orderService.updateStatus(order.id, isRework ? 'Moi' : 'DaGiaoHang');
                     break;
                 case "Tạm ngưng":
                     await orderService.updateStatus(order.id, 'TamNgung');
@@ -284,6 +293,18 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
     const isCancelled = order.status === 'Huy'; // NEW
     const isLocked = isPaused || isCompleted || isCancelled; // Locked if Cancelled too
 
+    // Nội dung nút "Sao chép": đơn làm lại ghi rõ gốc + lý do thay cho tổng tiền
+    const buildCopyText = () => [
+        `Mã đơn: ${order.order_code} `,
+        `Khách hàng: ${order.customer?.name || 'Vãng lai'} `,
+        ...(isRework ? [
+            `Sản xuất lại của: ${order.rework_of?.order_code || ''} `,
+            `Lý do: ${order.rework_reason || ''} `,
+        ] : []),
+        `Quy cách: \n${order.description || ''} `,
+        ...(isRework ? [] : [`Tổng tiền: ${order.total_amount?.toLocaleString('vi-VN')} đ`]),
+    ].join('\n\n');
+
     return (
         <div
             className={`bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border-l-[6px] flex flex-col h-full 
@@ -308,6 +329,34 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                             )}
                             <span className="text-sm font-bold text-[#00796b] block break-words">{order.customer?.name || 'Vãng lai'}</span>
                         </div>
+                        {/* Liên kết sản xuất lại: đơn -L chỉ về gốc; đơn gốc liệt kê các đơn -L của nó */}
+                        {isRework && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); if (order.rework_of) onOpenOrder?.(order.rework_of); }}
+                                className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-orange-100 text-orange-800 border border-orange-200 hover:bg-orange-200 transition-colors max-w-full"
+                                title="Mở đơn gốc"
+                            >
+                                <i className="fa-solid fa-rotate"></i>
+                                Làm lại đơn <span className="font-mono">{order.rework_of?.order_code || '…'}</span>
+                            </button>
+                        )}
+                        {!isRework && (order.reworks?.length || 0) > 0 && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px]">
+                                <span className="font-bold text-red-700"><i className="fa-solid fa-triangle-exclamation mr-1"></i>Đã làm lại:</span>
+                                {order.reworks!.map(r => (
+                                    <button
+                                        key={r.id}
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); onOpenOrder?.(r); }}
+                                        className={`px-1.5 py-0.5 rounded font-mono font-bold border transition-colors ${r.status === 'HoanThanh' ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : r.status === 'Huy' ? 'bg-gray-100 text-gray-500 border-gray-200 line-through' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'}`}
+                                        title={`${r.order_code} — ${r.status === 'HoanThanh' ? 'đã làm lại xong' : r.status === 'Huy' ? 'đơn làm lại đã hủy' : 'đang làm lại'}`}
+                                    >
+                                        {reworkSuffix(r.order_code)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                         {canEditDetails && !isCompleted && (
@@ -323,24 +372,14 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                             onClick={async (e) => {
                                 e.stopPropagation();
                                 try {
-                                    const text = [
-                                        `Mã đơn: ${order.order_code} `,
-                                        `Khách hàng: ${order.customer?.name || 'Vãng lai'} `,
-                                        `Quy cách: \n${order.description || ''} `,
-                                        `Tổng tiền: ${order.total_amount?.toLocaleString('vi-VN')} đ`
-                                    ].join('\n\n');
+                                    const text = buildCopyText();
 
                                     await navigator.clipboard.writeText(text);
                                     alert('✅ Đã sao chép nội dung (Text) thành công!');
                                 } catch (err) {
                                     console.error('Failed to copy:', err);
                                     // Fallback for older browsers
-                                    const text = [
-                                        `Mã đơn: ${order.order_code} `,
-                                        `Khách hàng: ${order.customer?.name || 'Vãng lai'} `,
-                                        `Quy cách: \n${order.description || ''} `,
-                                        `Tổng tiền: ${order.total_amount?.toLocaleString('vi-VN')} đ`
-                                    ].join('\n\n');
+                                    const text = buildCopyText();
 
                                     const textArea = document.createElement("textarea");
                                     textArea.value = text;
@@ -361,6 +400,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                         >
                             <i className="fa-regular fa-copy"></i>
                         </button>
+                        {isRework ? (
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full border shadow-sm whitespace-nowrap ${isCompleted ? 'bg-green-100 text-green-800 border-green-200' : isCancelled ? 'bg-gray-200 text-gray-600 border-gray-300' : 'bg-orange-100 text-orange-800 border-orange-200'}`}>
+                                {isCompleted ? <><i className="fa-solid fa-check mr-1"></i>Đã xong</> : isCancelled ? 'Đã hủy' : <><i className="fa-solid fa-rotate mr-1"></i>Đang làm lại</>}
+                            </span>
+                        ) : (
                         <select
                             className="text-sm bg-white border border-gray-300 rounded px-3 py-1.5 font-bold text-gray-800 focus:outline-none shadow-sm"
                             value={optimisticStatus}
@@ -401,11 +445,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                                 <option value={order.status}>{STATUS_LABEL_MAP[order.status] || order.status}</option>
                             )}
                         </select>
+                        )}
                     </div>
                 </div>
 
-                {/* Dynamic Stage Button */}
-                {renderStageControl()}
+                {/* Dynamic Stage Button — đơn sản xuất lại không có công đoạn */}
+                {!isRework && renderStageControl()}
 
                 {/* Body Details - Grid Layout matches Screenshot */}
                 <div className="p-4 space-y-3 flex-1 text-[14px]">
@@ -427,10 +472,21 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                                 </button>
                             )}
                             <p className="text-gray-800 whitespace-pre-line mb-2 pr-6">{order.description}</p>
+                            {isRework ? (
+                                <div className="bg-orange-50 border border-orange-200 rounded px-3 py-2 text-xs mt-1 space-y-1">
+                                    <div><span className="text-gray-600 font-medium">Lý do làm lại: </span><span className="text-orange-900 font-bold whitespace-pre-wrap">{order.rework_reason || 'Không ghi'}</span></div>
+                                    <div>
+                                        <span className="text-gray-600 font-medium">Chi phí làm lại: </span>
+                                        <span className="text-red-600 font-bold">{(order.rework_cost || 0).toLocaleString('vi-VN')} đ</span>
+                                        <span className="text-gray-400 ml-1">(nội bộ — trừ doanh số tháng khi hoàn thành)</span>
+                                    </div>
+                                </div>
+                            ) : (
                             <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-right text-xs mt-1">
                                 <span className="text-gray-600">{order.total_amount_pre_vat?.toLocaleString('vi-VN')} + {order.vat_amount?.toLocaleString('vi-VN')} (VAT) = </span>
                                 <span className="text-red-600 font-bold text-sm">{order.total_amount?.toLocaleString('vi-VN')}</span>
                             </div>
+                            )}
 
                             {/* Invoice Confirmation Button with Popover - NEW PLACEMENT */}
                             {order.vat_amount > 0 && canManageInvoice && (
@@ -626,7 +682,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                         </div>
                     </div>
 
-                    {/* Row: Thanh toán (Complex UI) */}
+                    {/* Row: Thanh toán (Complex UI) — ẩn với đơn sản xuất lại */}
+                    {!isRework && (
                     <div className="grid grid-cols-[85px_1fr] gap-2 items-start">
                         <div className="flex flex-col gap-2">
                             <span className="text-gray-600 font-medium mt-1.5 leading-tight">Thanh toán:</span>
@@ -776,6 +833,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Row: NV KD */}
                     <div className="grid grid-cols-[85px_1fr] gap-2 items-center pt-2 border-t border-gray-50 mt-1">
@@ -785,7 +843,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                         </div>
                     </div>
 
-                    {/* Tasks List */}
+                    {/* Tasks List — đơn sản xuất lại không có công đoạn phụ */}
+                    {!isRework && (
                     <div className="pt-4 mt-2 border-t border-gray-100">
                         <h4 className="font-bold text-gray-800 text-base mb-3">Công đoạn phụ</h4>
                         <div className="space-y-1">
@@ -879,6 +938,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                             })()}
                         </div>
                     </div>
+                    )}
                 </div>
             </div >
 
@@ -902,6 +962,31 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                         // Or Hide completely: style={{ display: canRestoreOrder ? 'flex' : 'none' }}
                         />
                         <ActionButton icon="fa-clock-rotate-left" color={COLORS.actionHistory} onClick={() => handleAction("Lịch sử")} title="Lịch sử" label="Lịch sử" />
+                    </>
+                ) : isRework ? (
+                    /* Đơn sản xuất lại: không thao tác công đoạn — chỉ Lịch sử, In phiếu,
+                       Sản xuất lại (lần nữa), Hoàn thành / Hoàn tác, Hủy */
+                    <>
+                        <ActionButton icon="fa-clock-rotate-left" color={COLORS.actionHistory} onClick={() => handleAction("Lịch sử")} title="Lịch sử" disabled={isPaused} label="Lịch sử" />
+                        <ActionButton icon="fa-print" color={COLORS.actionPrint} onClick={() => handleAction("In phiếu")} title="In phiếu sản xuất lại" disabled={isPaused} label="In phiếu" />
+                        {canRework && onRework && (
+                            <ActionButton icon="fa-rotate" color="#e65100" onClick={() => onRework(order)} title="Làm lại lần nữa (tạo đơn -L tiếp theo của đơn gốc)" disabled={isPaused} label={"Sản xuất\nlại"} />
+                        )}
+                        {isCompleted ? (
+                            <ActionButton
+                                icon="fa-rotate-left"
+                                color={COLORS.warning}
+                                onClick={() => handleAction("Hoàn tác")}
+                                title={canUndoComplete ? "Hoàn tác (trở lại Đang làm lại)" : "Chỉ Admin mới hoàn tác được. Vui lòng liên hệ Admin."}
+                                disabled={isPaused || !canUndoComplete}
+                                label="Hoàn tác"
+                            />
+                        ) : (
+                            <>
+                                <ActionButton icon="fa-check" color={COLORS.actionComplete} onClick={() => handleAction("Hoàn thành")} title="Đã làm lại xong" disabled={isPaused} label="Hoàn thành" />
+                                <ActionButton icon="fa-xmark" color={COLORS.actionCancel} onClick={() => handleAction("Xóa")} title="Hủy đơn làm lại" disabled={isPaused} label="Hủy đơn" />
+                            </>
+                        )}
                     </>
                 ) : (
                     <>
@@ -928,6 +1013,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                         <ActionButton icon="fa-clock-rotate-left" color={COLORS.actionHistory} onClick={() => handleAction("Lịch sử")} title="Lịch sử" disabled={isPaused} label="Lịch sử" />
                         <ActionButton icon="fa-print" color={COLORS.actionPrint} onClick={() => handleAction("In phiếu")} title="In phiếu" disabled={isPaused} label="In phiếu" />
                         <ActionButton icon="fa-truck" color={COLORS.actionShip} onClick={() => handleAction("In phiếu giao hàng")} title="In phiếu giao hàng" disabled={isPaused} label="Phiếu GH" />
+                        {canRework && onRework && (
+                            <ActionButton icon="fa-rotate" color="#e65100" onClick={() => onRework(order)} title="Tạo đơn sản xuất lại (đơn bị lỗi, khách không trả tiền; chi phí trừ doanh số tháng)" disabled={isPaused} label={"Sản xuất\nlại"} />
+                        )}
 
                         {
                             isCompleted ? (
@@ -1055,8 +1143,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
     );
 };
 
-// ... ActionButton helper ...
-// ... ActionButton helper ...
+// "26PD2908.0636-L2" -> "-L2" để chip trên đơn gốc ngắn gọn
+const reworkSuffix = (code: string) => {
+    const i = code.lastIndexOf('-L');
+    return i >= 0 ? code.slice(i) : code;
+};
+
 // ... ActionButton helper ...
 const ActionButton = ({ icon, color, onClick, title, disabled, label }: { icon: string, color: string, onClick: () => void, title: string, disabled?: boolean, label?: string }) => {
     // Mặc định tách mỗi chữ một dòng. Nhãn nào cần tự chọn chỗ ngắt dòng

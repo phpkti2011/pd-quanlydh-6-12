@@ -109,8 +109,25 @@ RETURNS TRIGGER AS $$
 DECLARE
     recipient_id UUID;
     v_order_code TEXT;
+    v_root_code  TEXT;
+    v_title      TEXT;
+    v_message    TEXT;
 BEGIN
     v_order_code := COALESCE(NEW.order_code, 'N/A');
+
+    IF NEW.rework_of_order_id IS NOT NULL THEN
+        -- Đơn sản xuất lại (setup_rework_orders.sql): nói rõ làm lại đơn nào,
+        -- vì sao, tốn bao nhiêu. Mã -L đứng TRƯỚC mã gốc trong câu để chuông
+        -- thông báo (NotificationBell) bắt đúng đơn làm lại khi bấm mở.
+        SELECT order_code INTO v_root_code FROM orders WHERE id = NEW.rework_of_order_id;
+        v_title   := 'Đơn SẢN XUẤT LẠI';
+        v_message := 'Đơn ' || v_order_code || ' làm lại đơn ' || COALESCE(v_root_code, 'N/A')
+                  || '. Lý do: ' || COALESCE(NULLIF(TRIM(NEW.rework_reason), ''), 'không ghi')
+                  || '. Chi phí: ' || replace(to_char(COALESCE(NEW.rework_cost, 0), 'FM999,999,999,999'), ',', '.') || 'đ.';
+    ELSE
+        v_title   := 'Đơn hàng mới';
+        v_message := 'Đơn hàng ' || v_order_code || ' vừa được tạo.';
+    END IF;
 
     -- Gửi cho Admin và QuanLySanXuat
     FOR recipient_id IN
@@ -120,8 +137,8 @@ BEGIN
     LOOP
         PERFORM create_notification(
             recipient_id,
-            'Đơn hàng mới',
-            'Đơn hàng ' || v_order_code || ' vừa được tạo.',
+            v_title,
+            v_message,
             'order',
             NEW.id,
             NULL

@@ -70,6 +70,15 @@ export interface Customer {
   updated_at?: string;
 }
 
+// Liên kết rút gọn giữa đơn gốc và đơn sản xuất lại (gắn ở orderService.attachReworkLinks)
+export interface ReworkLink {
+  id: string;
+  order_code: string;
+  status: OrderStatus;
+  created_at?: string;
+  rework_of_order_id?: string | null;
+}
+
 export interface Order {
   id: string;
   order_code: string;
@@ -137,6 +146,13 @@ export interface Order {
   customer?: Customer;
   sales_rep?: Profile;
   participants?: OrderProcessParticipant[];
+
+  // Đơn sản xuất lại (xem setup_rework_orders.sql)
+  rework_of_order_id?: string | null; // trỏ về đơn GỐC tận cùng; có giá trị = đây là đơn làm lại
+  rework_reason?: string | null;      // nguyên nhân phải làm lại
+  rework_cost?: number | null;        // chi phí làm lại — trừ doanh số tháng khi hoàn thành, không trừ NVKD
+  rework_of?: ReworkLink | null;      // đơn gốc (chỉ đơn làm lại mới có)
+  reworks?: ReworkLink[];             // các đơn làm lại của đơn này (chỉ đơn gốc mới có)
 }
 
 

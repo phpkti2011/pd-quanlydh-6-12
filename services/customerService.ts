@@ -253,13 +253,15 @@ export const customerService = {
         // 2. Fetch all orders (lightweight: only needed fields, exclude cancelled count separately)
         const { data: orders, error: ordErr } = await supabase
             .from('orders')
-            .select('customer_id, total_amount, status, created_at');
+            .select('customer_id, total_amount, status, created_at, rework_of_order_id');
         if (ordErr) throw ordErr;
 
         // 3. Aggregate client-side
         const orderMap = new Map<string, { total: number; revenue: number; cancelled: number; lastDate: string | null }>();
         for (const o of (orders || [])) {
             if (!o.customer_id) continue;
+            // Đơn sản xuất lại không phải đơn mới của khách (0đ, do xưởng làm hỏng)
+            if ((o as any).rework_of_order_id) continue;
             const entry = orderMap.get(o.customer_id) || { total: 0, revenue: 0, cancelled: 0, lastDate: null };
             if (o.status === 'Huy') {
                 entry.cancelled++;

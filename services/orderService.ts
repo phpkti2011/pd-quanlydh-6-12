@@ -1,5 +1,93 @@
 import { supabase } from './supabaseClient';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, ReworkLink } from '../types';
+import { REWORK_TAB } from '../constants';
+
+/**
+ * Gắn liên kết đơn sản xuất lại cho một danh sách đơn (xem setup_rework_orders.sql):
+ *   - đơn làm lại  -> order.rework_of = đơn gốc
+ *   - đơn gốc      -> order.reworks  = các đơn làm lại của nó
+ * Dùng MỘT truy vấn phụ thay cho embed tự tham chiếu (orders!rework_of_order_id):
+ * PostgREST không phân biệt được chiều cha/con trên khoá ngoại tự trỏ về chính
+ * bảng, dễ trả lỗi PGRST201 làm cả danh sách không tải được. Lỗi ở đây chỉ
+ * ghi log, danh sách vẫn hiện (thiếu chip liên kết) thay vì trắng màn hình.
+ */
+async function attachReworkLinks(orders: Order[]): Promise<Order[]> {
+    if (!orders.length) return orders;
+    const ids = orders.map(o => o.id);
+    const parentIds = [...new Set(orders.map(o => o.rework_of_order_id).filter((v): v is string => !!v))];
+    const orParts = [`rework_of_order_id.in.(${ids.join(',')})`];
+    if (parentIds.length) orParts.push(`id.in.(${parentIds.join(',')})`);
+
+    const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_code, status, created_at, rework_of_order_id')
+        .or(orParts.join(','));
+    if (error) {
+        console.error('attachReworkLinks:', error);
+        return orders;
+    }
+
+    const rows = (data || []) as ReworkLink[];
+    const byId = new Map(rows.map(r => [r.id, r]));
+    const childrenOf = new Map<string, ReworkLink[]>();
+    for (const r of rows) {
+        if (!r.rework_of_order_id) continue;
+        const list = childrenOf.get(r.rework_of_order_id) || [];
+        list.push(r);
+        childrenOf.set(r.rework_of_order_id, list);
+    }
+    for (const o of orders) {
+        o.rework_of = o.rework_of_order_id ? (byId.get(o.rework_of_order_id) || null) : null;
+        o.reworks = (childrenOf.get(o.id) || [])
+            .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+    }
+    return orders;
+}
+
+/**
+ * Bản nháp đơn sản xuất lại, chép từ đơn đang xem (`source`) và treo vào đơn gốc
+ * tận cùng (`root`). Khách không trả tiền: mọi khoản tiền/phí = 0, thanh toán coi
+ * như xong để không lọt vào Công nợ / Cần thu. KHÔNG gửi order_code — trigger
+ * set_order_code sinh <mã gốc>-L{n}.
+ */
+export function buildReworkDraft(source: Order, root: { id: string }): Partial<Order> {
+    return {
+        rework_of_order_id: root.id,
+        rework_reason: '',
+        rework_cost: 0,
+
+        customer_id: source.customer_id,
+        customer: source.customer,
+        sales_rep_id: source.sales_rep_id,
+        description: source.description,
+        notes: source.notes,
+        delivery_address: source.delivery_address,
+        outsource_note: source.outsource_note,
+
+        has_design: !!source.has_design,
+        has_large_print: !!source.has_large_print,
+        has_be_demi: !!source.has_be_demi,
+        has_gia_cong_ngoai: !!source.has_gia_cong_ngoai,
+        has_ep_kim: !!source.has_ep_kim,
+        has_can_mang: !!source.has_can_mang,
+        design_fee: 0,
+        large_print_fee: 0,
+        be_demi_fee: 0,
+        gia_cong_ngoai_fee: 0,
+        ep_kim_fee: 0,
+        can_mang_fee: 0,
+
+        total_amount_pre_vat: 0,
+        vat_rate: 0,
+        vat_amount: 0,
+        total_amount: 0,
+        deposit_amount: 0,
+        remaining_amount: 0,
+        payment_status: 'DaThanhToan',
+        is_urgent: false,
+        status: 'Moi',
+    };
+}
 
 export const orderService = {
 
@@ -20,6 +108,7 @@ export const orderService = {
             .single();
 
         if (error) throw error;
+        await attachReworkLinks([data as Order]);
         return data as Order;
     },
 
@@ -152,6 +241,15 @@ export const orderService = {
         const isSearching = !!additionalFilters?.searchTerm;
 
         if (!isSearching && tab !== 'Tất cả' && tab !== '📊 Tổng quan') {
+            // Đơn sản xuất lại chỉ nằm ở tab riêng (và "Tất cả"). Chúng chép cờ
+            // has_* từ đơn gốc nên nếu không chặn sẽ lọt vào tab Thiết Kế / Ép Kim...
+            // Tab riêng không lọc trạng thái: switch bên dưới không có case cho nó.
+            if (tab === REWORK_TAB) {
+                query = query.not('rework_of_order_id', 'is', null);
+            } else {
+                query = query.is('rework_of_order_id', null);
+            }
+
             // Map UI tabs to Statuses
             switch (tab) {
                 case 'Chưa xử lý': // Legacy support if needed, or alias check
@@ -250,7 +348,9 @@ export const orderService = {
 
         const { data, error, count } = await query;
         if (error) throw error;
-        return { data: data as Order[], count: count || 0 };
+        const rows = (data || []) as Order[];
+        await attachReworkLinks(rows);
+        return { data: rows, count: count || 0 };
     },
 
     // CREATE Order
@@ -261,6 +361,10 @@ export const orderService = {
         delete payload.customer;
         delete payload.sales_rep;
         delete payload.participants;
+        delete payload.payment_confirmed_by_user;
+        // Liên kết sản xuất lại chỉ là dữ liệu gắn thêm ở client, không phải cột
+        delete payload.rework_of;
+        delete payload.reworks;
 
         // Remove 'tags' which causes DB error
         delete payload.tags;
@@ -290,6 +394,9 @@ export const orderService = {
         delete payload.sales_rep;
         delete payload.participants;
         delete payload.payment_confirmed_by_user;
+        // Liên kết sản xuất lại chỉ là dữ liệu gắn thêm ở client, không phải cột
+        delete payload.rework_of;
+        delete payload.reworks;
 
         // Remove 'tags' which causes DB error (Not in Schema)
         delete payload.tags;
@@ -455,7 +562,7 @@ export const orderService = {
     async getAllOrderStatuses(filterMonth?: number, filterYear?: number) {
         let query = supabase
             .from('orders')
-            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status');
+            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status, rework_of_order_id');
 
         // Apply month filter
         if (filterMonth && filterYear) {

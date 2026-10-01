@@ -211,7 +211,7 @@ async function getEmployeeStats(name?: string): Promise<string> {
     const { count: totalOrders } = await db.from('orders').select('*', { count: 'exact', head: true }).eq('sales_rep_id', s.id);
     // Doanh thu tháng
     const monthStart = new Date().toISOString().slice(0, 7) + '-01T00:00:00+07:00';
-    const { data: monthData } = await db.from('orders').select('total_amount').eq('sales_rep_id', s.id).gte('created_at', monthStart).not('status', 'eq', 'Huy');
+    const { data: monthData } = await db.from('orders').select('total_amount').eq('sales_rep_id', s.id).gte('created_at', monthStart).not('status', 'eq', 'Huy').is('rework_of_order_id', null);
     const monthRevenue = (monthData || []).reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
     // Đơn đang xử lý
     const { count: pendingOrders } = await db.from('orders').select('*', { count: 'exact', head: true }).eq('sales_rep_id', s.id).not('status', 'in', '("HoanThanh","Huy")');
@@ -239,7 +239,7 @@ async function getEmployeeStats(name?: string): Promise<string> {
 
   for (const e of employees) {
     const { count: todayC } = await db.from('orders').select('*', { count: 'exact', head: true }).eq('sales_rep_id', e.id).gte('created_at', start).lte('created_at', end);
-    const { data: mData } = await db.from('orders').select('total_amount').eq('sales_rep_id', e.id).gte('created_at', monthStart).not('status', 'eq', 'Huy');
+    const { data: mData } = await db.from('orders').select('total_amount').eq('sales_rep_id', e.id).gte('created_at', monthStart).not('status', 'eq', 'Huy').is('rework_of_order_id', null);
     const mRev = (mData || []).reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
     msg += `• *${e.full_name}*: Hôm nay ${todayC || 0} đơn | DT tháng: ${fmt(mRev)}\n`;
   }
@@ -269,16 +269,22 @@ async function getRevenueByPeriod(period: string): Promise<string> {
     label = `NĂM ${vnNow.getFullYear()}`;
   }
 
-  const { data, error } = await db.from('orders')
-    .select('total_amount, status')
+  const { data: rawData, error } = await db.from('orders')
+    .select('total_amount, status, rework_of_order_id, rework_cost')
     .gte('created_at', start).lte('created_at', end)
     .not('status', 'eq', 'Huy');
 
   if (error) return `❌ Lỗi: ${error.message}`;
 
-  const total = (data || []).reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
-  const completed = (data || []).filter((o: any) => o.status === 'HoanThanh');
-  const completedRev = completed.reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+  // Đơn sản xuất lại: không tính số đơn, chỉ trừ chi phí làm lại khỏi doanh thu
+  const reworks = (rawData || []).filter((o: any) => o.rework_of_order_id);
+  const reworkCost = reworks.reduce((s: number, o: any) => s + (o.rework_cost || 0), 0);
+  const data = (rawData || []).filter((o: any) => !o.rework_of_order_id);
+
+  const total = data.reduce((s: number, o: any) => s + (o.total_amount || 0), 0) - reworkCost;
+  const completed = data.filter((o: any) => o.status === 'HoanThanh');
+  const completedRev = completed.reduce((s: number, o: any) => s + (o.total_amount || 0), 0)
+    - reworks.filter((o: any) => o.status === 'HoanThanh').reduce((s: number, o: any) => s + (o.rework_cost || 0), 0);
 
   let msg = `💰 *DOANH THU ${label}*\n━━━━━━━━━━━━━━━━━━━\n\n`;
   msg += `• Tổng DT: *${fmt(total)}*\n`;
@@ -336,7 +342,8 @@ async function getTopCustomers(): Promise<string> {
   const { data, error } = await db.from('orders')
     .select('total_amount, customer:customers(name, code)')
     .gte('created_at', monthStart)
-    .not('status', 'eq', 'Huy');
+    .not('status', 'eq', 'Huy')
+    .is('rework_of_order_id', null); // đơn sản xuất lại không phải đơn mua của khách
 
   if (error) return `❌ Lỗi: ${error.message}`;
 
@@ -447,7 +454,7 @@ async function handleMessage(chatId: string, text: string): Promise<string> {
   if (/top khach|top kh|top customer/.test(cmd)) return await getTopCustomers();
 
   // Nếu nhập mã đơn trực tiếp (VD: "26PD2703.0001")
-  if (/^\d{2}PD\d{4}\.\d+$/i.test(original.trim())) return await searchOrder(original.trim());
+  if (/^\d{2}PD\d{4}\.\d+(?:-L\d+)?$/i.test(original.trim())) return await searchOrder(original.trim());
 
   // Không hiểu → gợi ý
   return `🤔 Không hiểu: "${original}"\n\nGõ *menu* để xem danh sách lệnh.`;

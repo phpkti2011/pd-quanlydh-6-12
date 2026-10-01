@@ -19,15 +19,22 @@ BEGIN
     v_month_start := date_trunc('month', p_date)::timestamptz;
     v_month_end := (date_trunc('month', p_date) + interval '1 month')::timestamptz;
 
+    -- Đơn sản xuất lại (rework_of_order_id IS NOT NULL, xem setup_rework_orders.sql):
+    --   * KHÔNG tính vào số đơn (giống đơn Hủy)
+    --   * chi phí làm lại (rework_cost) TRỪ khỏi doanh thu; đơn thường có
+    --     rework_cost = 0 nên total_amount - rework_cost không đổi gì
+    --   * doanh số theo NVKD KHÔNG trừ (quyết định của Admin)
     SELECT json_build_object(
         'report_date', p_date,
         'orders_created_today', (
             SELECT COUNT(*) FROM orders
             WHERE created_at >= v_start AND created_at < v_end
+            AND rework_of_order_id IS NULL
         ),
         'orders_completed_today', (
             SELECT COUNT(*) FROM orders
             WHERE status::text = 'HoanThanh'
+            AND rework_of_order_id IS NULL
             AND CASE
                 WHEN completed_at IS NOT NULL THEN completed_at >= v_start AND completed_at < v_end
                 ELSE updated_at >= v_start AND updated_at < v_end
@@ -36,20 +43,21 @@ BEGIN
         'orders_cancelled_today', (
             SELECT COUNT(*) FROM orders
             WHERE status::text = 'Huy'
+            AND rework_of_order_id IS NULL
             AND updated_at >= v_start AND updated_at < v_end
         ),
         'revenue_today', (
-            SELECT COALESCE(SUM(total_amount), 0) FROM orders
+            SELECT COALESCE(SUM(total_amount - COALESCE(rework_cost, 0)), 0) FROM orders
             WHERE created_at >= v_start AND created_at < v_end
             AND status::text NOT IN ('Huy')
         ),
         'revenue_today_pre_vat', (
-            SELECT COALESCE(SUM(total_amount_pre_vat), 0) FROM orders
+            SELECT COALESCE(SUM(total_amount_pre_vat - COALESCE(rework_cost, 0)), 0) FROM orders
             WHERE created_at >= v_start AND created_at < v_end
             AND status::text NOT IN ('Huy')
         ),
         'revenue_completed_today', (
-            SELECT COALESCE(SUM(total_amount_pre_vat), 0) FROM orders
+            SELECT COALESCE(SUM(total_amount_pre_vat - COALESCE(rework_cost, 0)), 0) FROM orders
             WHERE status::text = 'HoanThanh'
             AND CASE
                 WHEN completed_at IS NOT NULL THEN completed_at >= v_start AND completed_at < v_end
@@ -57,13 +65,26 @@ BEGIN
             END
         ),
         'revenue_month_total', (
-            SELECT COALESCE(SUM(total_amount), 0) FROM orders
+            SELECT COALESCE(SUM(total_amount - COALESCE(rework_cost, 0)), 0) FROM orders
             WHERE created_at >= v_month_start AND created_at < v_month_end
             AND status::text NOT IN ('Huy')
         ),
         'revenue_month_pre_vat', (
-            SELECT COALESCE(SUM(total_amount_pre_vat), 0) FROM orders
+            SELECT COALESCE(SUM(total_amount_pre_vat - COALESCE(rework_cost, 0)), 0) FROM orders
             WHERE created_at >= v_month_start AND created_at < v_month_end
+            AND status::text NOT IN ('Huy')
+        ),
+        -- Đơn sản xuất lại tạo trong tháng (chưa hủy) và tổng chi phí của chúng
+        'rework_count_month', (
+            SELECT COUNT(*) FROM orders
+            WHERE rework_of_order_id IS NOT NULL
+            AND created_at >= v_month_start AND created_at < v_month_end
+            AND status::text NOT IN ('Huy')
+        ),
+        'rework_cost_month', (
+            SELECT COALESCE(SUM(COALESCE(rework_cost, 0)), 0) FROM orders
+            WHERE rework_of_order_id IS NOT NULL
+            AND created_at >= v_month_start AND created_at < v_month_end
             AND status::text NOT IN ('Huy')
         ),
         'sales_by_employee', (
@@ -72,9 +93,10 @@ BEGIN
                 SELECT
                     p.full_name AS employee_name,
                     p.role::text AS role,
-                    COUNT(o.id) AS orders_created,
+                    COUNT(o.id) FILTER (WHERE o.rework_of_order_id IS NULL) AS orders_created,
                     COALESCE(SUM(o.total_amount), 0) AS revenue,
-                    COUNT(CASE WHEN o.status::text = 'HoanThanh'
+                    COUNT(CASE WHEN o.rework_of_order_id IS NULL
+                        AND o.status::text = 'HoanThanh'
                         AND CASE
                             WHEN o.completed_at IS NOT NULL THEN o.completed_at >= v_start AND o.completed_at < v_end
                             ELSE o.updated_at >= v_start AND o.updated_at < v_end

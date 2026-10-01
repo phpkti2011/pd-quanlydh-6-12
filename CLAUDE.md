@@ -24,6 +24,13 @@ Repo có nhiều file `fix_*.sql` cùng định nghĩa một hàm. Ai chạy fil
 
 - Khi sửa một hàm: **sửa cả file gốc đang định nghĩa nó**, không chỉ tạo file `fix_` mới.
 - **Không giữ 2 bản logic song song** (SQL và TypeScript) cho cùng một việc.
+- Doanh số tháng cho mốc thưởng sản xuất chỉ tính ở **một** hàm `production_revenue_in_period()` (`setup_rework_orders.sql`), đã trừ chi phí đơn sản xuất lại. `get_production_commission_summary` và `get_staff_commission_rows` gọi hàm đó — **đừng chép lại đoạn `SUM(total_amount_pre_vat)`** vào hàm nào nữa.
+
+## Đơn sản xuất lại (`rework_of_order_id IS NOT NULL`)
+
+- Là đơn làm lại do xưởng làm hỏng: 0đ, không công đoạn, không hoa hồng; mã `<mã gốc>-L1, -L2…` do trigger `set_order_code` sinh. Xem `setup_rework_orders.sql`.
+- Mọi báo cáo "số đơn" phải **loại** chúng (`rework_of_order_id IS NULL`), đứng cạnh chỗ đang loại đơn `Huy`. Doanh thu công ty và doanh số mốc sản xuất **trừ** `rework_cost`; doanh số **NVKD không trừ**.
+- Liên kết gốc ↔ làm lại gắn ở `orderService.attachReworkLinks` bằng truy vấn phụ, **không** dùng embed tự tham chiếu `orders!rework_of_order_id` (PostgREST hay báo PGRST201).
 
 ## File SQL KHÔNG được chạy lại
 

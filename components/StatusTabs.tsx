@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { UserRole } from '../types';
+import { REWORK_TAB } from '../constants';
 
 interface StatusTabsProps {
     currentTab: string;
@@ -37,7 +38,8 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
                 'In Khổ Lớn': 'in_kho_lon',
                 'Bế Demi': 'be_demi',
                 'Gia công ngoài': 'gia_cong_ngoai',
-                'Ép Kim': 'ep_kim'
+                'Ép Kim': 'ep_kim',
+                [REWORK_TAB]: 'san_xuat_lai'
             };
             return map[label] || '';
         };
@@ -53,7 +55,8 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         // Changed "Hoàn thành" to "Đã hoàn thành" to match screenshot
         const row2Labels = [
             "Đã hoàn thành", "Gấp", "Đã hủy",
-            "Thiết Kế", "In Khổ Lớn", "Bế Demi", "Gia công ngoài", "Ép Kim"
+            "Thiết Kế", "In Khổ Lớn", "Bế Demi", "Gia công ngoài", "Ép Kim",
+            REWORK_TAB
         ];
 
         const createTab = (label: string, isTask: boolean = false, isSpecial: boolean = false) => ({
@@ -140,6 +143,7 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         // Standard Tab Styling
         let activeBg = "bg-[#00796b]";
         if (tab.Key === "Xuất hóa đơn" && isActive) activeBg = "bg-[#e91e63]";
+        if (tab.key === REWORK_TAB) activeBg = "bg-[#e65100]"; // cam: đơn sản xuất lại
 
         const activeClass = isActive
             ? `${activeBg} text-white shadow-md border-transparent`
@@ -172,6 +176,12 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
             return [
                 { key: 'Chưa xuất', label: 'Chưa xuất' },
                 { key: 'Đã xuất', label: 'Đã xuất' }
+            ];
+        }
+        if (tabKey === REWORK_TAB) {
+            return [
+                { key: 'Chưa xong', label: 'Chưa xong' },
+                { key: 'Đã xong', label: 'Đã xong' }
             ];
         }
         const taskTabs = ['Thiết Kế', 'In Khổ Lớn', 'Bế Demi', 'Gia công ngoài', 'Ép Kim'];

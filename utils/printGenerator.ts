@@ -3,7 +3,9 @@ import { LOGO_SVG } from './logoSVG';
 
 export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = 'receipt', customLogo?: string, customBackground?: string) => {
     const isReceipt = type === 'receipt';
-    const title = isReceipt ? 'ĐƠN ĐẶT HÀNG' : 'PHIẾU GIAO HÀNG';
+    // Đơn sản xuất lại: phiếu nội bộ — không tiền, không điều khoản, ghi rõ gốc + lý do
+    const isRework = !!order.rework_of_order_id;
+    const title = isReceipt ? (isRework ? 'PHIẾU SẢN XUẤT LẠI' : 'ĐƠN ĐẶT HÀNG') : 'PHIẾU GIAO HÀNG';
 
     // Use embedded SVG logo by default (always works reliably)
     // If custom logo is provided (e.g. base64), use it, otherwise use the SVG constant
@@ -110,6 +112,7 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
                 <td class="order-meta-column">
                     <div>MÃ ĐH: ${order.order_code}</div>
                     <div>NGÀY: ${dateStr}</div>
+                    ${isRework ? `<div style="color:#e65100;">SX LẠI CỦA: ${order.rework_of?.order_code || ''}</div>` : ''}
                 </td>
             </tr>
         </table>
@@ -126,6 +129,9 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
             <div class="customer-row">
                 <span>Địa chỉ: ${order.customer?.address || order.delivery_address || ''}</span>
             </div>
+            ${isRework ? `<div class="customer-row" style="color:#e65100;">
+                <span>LÝ DO SẢN XUẤT LẠI: ${order.rework_reason || ''}</span>
+            </div>` : ''}
         </div>
 
         <!-- MAIN TABLE -->
@@ -133,7 +139,7 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
             <thead>
                 <tr>
                     <th class="col-desc">SẢN PHẨM - QUY CÁCH</th>
-                    <th class="col-amount">${isReceipt ? 'THÀNH TIỀN' : 'SỐ LƯỢNG GIAO HÀNG'}</th>
+                    <th class="col-amount">${isReceipt ? (isRework ? 'GHI CHÚ' : 'THÀNH TIỀN') : 'SỐ LƯỢNG GIAO HÀNG'}</th>
                 </tr>
             </thead>
             <tbody>
@@ -143,7 +149,7 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
                         ${order.description || ''}
                     </td>
                     <td class="col-amount" style="vertical-align: top; padding-top: 5px;">
-                        ${isReceipt ? (order.total_amount_pre_vat?.toLocaleString('vi-VN') + ' VNĐ') : ''}
+                        ${isReceipt && !isRework ? (order.total_amount_pre_vat?.toLocaleString('vi-VN') + ' VNĐ') : ''}
                     </td>
                 </tr>
                 
@@ -152,8 +158,8 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
                    <td></td><td></td>
                 </tr>
 
-                <!-- Summary Section (Only for Receipt) -->
-                ${isReceipt ? `
+                <!-- Summary Section (Only for Receipt; không in cho đơn sản xuất lại) -->
+                ${isReceipt && !isRework ? `
                 <tr class="summary-row">
                     <td class="summary-label">TỔNG TIỀN (CHƯA VAT)</td>
                     <td>${order.total_amount_pre_vat?.toLocaleString('vi-VN')} VNĐ</td>
@@ -216,7 +222,8 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
             `}
         </div>
 
-        <!-- TERMS AND CONDITIONS (Compact) -->
+        <!-- TERMS AND CONDITIONS (Compact) — bỏ với phiếu sản xuất lại (nội bộ) -->
+        ${isRework ? '' : `
         <div class="terms-section" style="font-size: 7.5pt; line-height: 1.3;">
             <div class="term-block" style="display: flex; justify-content: space-between; gap: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; margin-bottom: 8px;">
                 <div style="flex: 0 0 40%;">
@@ -257,6 +264,7 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
                 </div>
             </div>
         </div>
+        `}
       </div>
       <script>
         window.onload = function() { window.print(); }

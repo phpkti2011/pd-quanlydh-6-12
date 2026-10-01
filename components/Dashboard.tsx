@@ -37,9 +37,11 @@ interface DashboardProps {
   currentUser?: any;
   /** Mở form sửa đơn ở App (OrderModal) */
   onEditOrder?: (order: Order) => void;
+  /** Tạo đơn sản xuất lại ở App (OrderModal với reworkOf) */
+  onReworkOrder?: (order: Order) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, onEditOrder }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, onEditOrder, onReworkOrder }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [debtStats, setDebtStats] = useState({ totalAmount: 0, count: 0 });
   const [collectionStats, setCollectionStats] = useState({ totalAmount: 0, count: 0 });
@@ -591,6 +593,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onEditOrder }) => {
                         {order.is_urgent && <i className="fa-solid fa-bolt mr-1"></i>}
                         {STATUS_LABEL_MAP[order.status] || order.status}
                       </span>
+                      {order.rework_of_order_id && (
+                        <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200" title="Đơn sản xuất lại">
+                          <i className="fa-solid fa-rotate mr-1"></i>Làm lại
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-medium">
                       {order.order_code ? (
@@ -720,6 +727,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onEditOrder }) => {
                 onEditOrder?.(o);
               }}
               onViewHistory={handleViewHistory}
+              onRework={(o) => {
+                setDetailOrder(null);
+                onReworkOrder?.(o);
+              }}
+              onOpenOrder={(ref) => openOrderDetail(ref.id)}
             />
           </div>
         </div>

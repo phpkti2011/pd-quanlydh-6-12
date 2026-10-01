@@ -176,21 +176,10 @@ DECLARE
     v_transition_date   DATE := '2026-03-01';
     v_deduct_total      NUMERIC := 0;
 BEGIN
-    -- Doanh số tháng (trước VAT) — giữ nguyên quy tắc chuyển đổi 01/03/2026
-    SELECT COALESCE(SUM(total_amount_pre_vat), 0)
-    INTO v_total_month_sales
-    FROM orders
-    WHERE status = 'HoanThanh'
-    AND (
-        (created_at::DATE < v_transition_date
-         AND created_at::DATE >= p_start_date
-         AND created_at::DATE <= p_end_date)
-        OR
-        (created_at::DATE >= v_transition_date
-         AND completed_at IS NOT NULL
-         AND completed_at::DATE >= p_start_date
-         AND completed_at::DATE <= p_end_date)
-    );
+    -- Doanh số tháng (trước VAT, đã trừ chi phí sản xuất lại) — một hàm dùng chung
+    -- với get_production_commission_summary, xem setup_rework_orders.sql.
+    -- Quy tắc chuyển đổi 01/03/2026 nằm trong hàm đó.
+    v_total_month_sales := production_revenue_in_period(p_start_date, p_end_date);
 
     v_tier_pct := get_production_tier_rate(
         v_total_month_sales,
@@ -248,6 +237,8 @@ BEGIN
              AND o.completed_at::DATE >= p_start_date
              AND o.completed_at::DATE <= p_end_date)
         )
+        -- Đơn sản xuất lại: 0đ, không công đoạn -> không có hoa hồng (setup_rework_orders.sql)
+        AND o.rework_of_order_id IS NULL
         AND p.role != 'NhanVienKinhDoanh'
     ),
 
@@ -301,6 +292,8 @@ BEGIN
              AND o.completed_at::DATE >= p_start_date
              AND o.completed_at::DATE <= p_end_date)
         )
+        -- Đơn sản xuất lại không tính cho quản lý sản xuất (setup_rework_orders.sql)
+        AND o.rework_of_order_id IS NULL
         AND p.role = 'QuanLySanXuat'
         AND p.product_manager_commission_rate IS NOT NULL
         AND p.product_manager_commission_rate > 0

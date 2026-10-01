@@ -75,7 +75,7 @@ export const dashboardService = {
 
         let completedRevQuery = supabase
             .from('orders')
-            .select('total_amount, vat_amount, created_at, status')
+            .select('total_amount, vat_amount, created_at, status, rework_cost')
             .eq('status', 'HoanThanh')
             .gte('completed_at', start.toISOString())
             .lte('completed_at', end.toISOString());
@@ -88,7 +88,8 @@ export const dashboardService = {
 
         if (completedOrdersData) {
             completedOrdersData.forEach(o => {
-                completedRevenueNoVATValue += ((o.total_amount || 0) - (o.vat_amount || 0));
+                // Đơn sản xuất lại: total = 0, rework_cost > 0 -> trừ đúng chi phí làm lại
+                completedRevenueNoVATValue += ((o.total_amount || 0) - (o.vat_amount || 0) - ((o as any).rework_cost || 0));
             });
         }
 
@@ -116,7 +117,7 @@ export const dashboardService = {
             in: 0, thanh_pham: 0, dong_goi: 0, cho_giao_hang: 0, da_giao_hang: 0,
             hoan_thanh: 0, huy: 0, tam_ngung: 0,
             thiet_ke: 0, in_kho_lon: 0, be_demi: 0, gia_cong_ngoai: 0, ep_kim: 0,
-            xuat_hoa_don: 0, gap: 0
+            xuat_hoa_don: 0, gap: 0, san_xuat_lai: 0
         };
 
         // 4. Get customers' first order dates from ALL history (not just current period)
@@ -149,6 +150,19 @@ export const dashboardService = {
         allOrders.forEach(order => {
             // Tab Counts (ALL orders)
             tabCounts.all++;
+
+            // Đơn sản xuất lại (setup_rework_orders.sql): không tính vào số đơn,
+            // không vào biểu đồ / khách mới; chỉ TRỪ chi phí làm lại khỏi doanh thu
+            // và đếm ở tab riêng. Vẫn nằm trong incompleteOrders bên dưới.
+            if (order.rework_of_order_id) {
+                if (!['HoanThanh', 'Huy'].includes(order.status)) tabCounts.san_xuat_lai++;
+                if (order.status !== 'Huy') {
+                    const cost = order.rework_cost || 0;
+                    metrics.revenueWithVAT -= cost;
+                    metrics.revenueNoVAT -= cost;
+                }
+                return;
+            }
 
             const statusKey = order.status === 'TiepNhan' ? 'tiep_nhan' :
                 order.status === 'NhanFile' ? 'nhan_file' :

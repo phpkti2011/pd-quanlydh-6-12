@@ -344,7 +344,8 @@ BEGIN
             o.sales_rep_id, p.full_name,
             COALESCE(st.commission_tiers, p.commission_tiers) as effective_tiers,
             COALESCE(SUM(o.total_amount), 0) as total_sales,
-            COUNT(o.id) as order_count
+            -- Đơn sản xuất lại không tính vào số đơn (setup_rework_orders.sql)
+            COUNT(o.id) FILTER (WHERE o.rework_of_order_id IS NULL) as order_count
         FROM orders o
         JOIN profiles p ON o.sales_rep_id = p.id
         LEFT JOIN sales_targets st ON st.entity_type = 'user' 

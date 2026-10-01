@@ -13,9 +13,11 @@ interface OrderModalProps {
   onSubmit: (order: Partial<Order>) => void;
   initialData?: Order | null;
   userRole?: string;
+  /** Đang tạo đơn SẢN XUẤT LẠI cho đơn gốc này: form ở chế độ tạo mới dù có initialData (bản nháp chép từ đơn gốc) */
+  reworkOf?: { id: string; order_code: string; nextCode: string } | null;
 }
 
-const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, initialData, userRole }) => {
+const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, initialData, userRole, reworkOf }) => {
   const [formData, setFormData] = useState<Partial<Order>>({
     vat_rate: 0,
     total_amount_pre_vat: 0,
@@ -31,6 +33,15 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
 
   // State for AI Modal
   const [showAIModal, setShowAIModal] = useState(false);
+
+  // Đơn sản xuất lại (xem setup_rework_orders.sql): khách không trả tiền, nên
+  // ẩn toàn bộ khối tiền/phí; bắt buộc nhập nguyên nhân; chi phí làm lại trừ
+  // doanh số tháng khi hoàn thành (không trừ NVKD).
+  //   reworkOf có          -> đang TẠO đơn làm lại (initialData chỉ là bản nháp)
+  //   initialData là đơn -L -> đang SỬA một đơn làm lại đã có (vẫn ẩn tiền)
+  const isRework = !!reworkOf || !!initialData?.rework_of_order_id;
+  const isEdit = !!initialData && !reworkOf;
+  const reworkRootCode = reworkOf?.order_code || initialData?.rework_of?.order_code || '…';
 
   useEffect(() => {
     if (initialData) {
@@ -135,12 +146,34 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
       return;
     }
 
+    // 2b. Đơn sản xuất lại: bắt buộc có nguyên nhân
+    if (isRework && !(formData.rework_reason || '').trim()) {
+      alert("Vui lòng nhập nguyên nhân phải sản xuất lại!");
+      return;
+    }
+
     // 3. Clean Data before Submit
     const payload = { ...formData };
 
     // Fix Dates: If empty string, set to null or undefined to avoid DB error
     if (payload.delivery_date === '') {
       payload.delivery_date = null as any;
+    }
+
+    // Đơn sản xuất lại: khoá mọi khoản tiền về 0 dù form có bị sửa kiểu gì;
+    // khi TẠO không gửi order_code để trigger CSDL sinh <mã gốc>-L{n}
+    if (isRework) {
+      if (reworkOf) {
+        payload.rework_of_order_id = reworkOf.id;
+        delete payload.order_code;
+      }
+      payload.rework_reason = (payload.rework_reason || '').trim();
+      payload.rework_cost = Math.max(0, Number(payload.rework_cost) || 0);
+      Object.assign(payload, {
+        total_amount_pre_vat: 0, vat_rate: 0, vat_amount: 0, total_amount: 0,
+        deposit_amount: 0, remaining_amount: 0, payment_status: 'DaThanhToan',
+        design_fee: 0, large_print_fee: 0, be_demi_fee: 0, gia_cong_ngoai_fee: 0, ep_kim_fee: 0, can_mang_fee: 0,
+      });
     }
 
     onSubmit(payload);
@@ -153,11 +186,11 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50 rounded-t-xl sticky top-0 z-10">
             <div>
-              <h3 className="text-xl font-bold text-[#00796b] flex items-center gap-2">
-                <i className={`fa-solid ${initialData ? 'fa-pen-to-square' : 'fa-plus-circle'}`}></i>
-                {initialData ? `Đơn hàng ${initialData.order_code}` : 'Tạo Đơn Hàng Mới'}
+              <h3 className={`text-xl font-bold ${isRework ? 'text-[#e65100]' : 'text-[#00796b]'} flex items-center gap-2`}>
+                <i className={`fa-solid ${isRework && !isEdit ? 'fa-rotate' : isEdit ? 'fa-pen-to-square' : 'fa-plus-circle'}`}></i>
+                {isRework && !isEdit ? 'Tạo Đơn Sản Xuất Lại' : isEdit ? `Đơn hàng ${initialData!.order_code}` : 'Tạo Đơn Hàng Mới'}
               </h3>
-              {initialData && initialData.created_at && <span className="text-sm text-gray-500">Ngày tạo: {formatDateTime(initialData.created_at)}</span>}
+              {isEdit && initialData!.created_at && <span className="text-sm text-gray-500">Ngày tạo: {formatDateTime(initialData!.created_at)}</span>}
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200">
               <i className="fa-solid fa-xmark text-xl"></i>
@@ -165,6 +198,44 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
           </div>
 
           <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Đơn sản xuất lại: đơn gốc, mã dự kiến, nguyên nhân (bắt buộc), chi phí */}
+            {isRework && (
+              <div className="lg:col-span-12 bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-2 text-orange-900">
+                  <i className="fa-solid fa-rotate mt-1"></i>
+                  <div className="text-sm">
+                    <div className="font-bold">Đơn sản xuất lại của <span className="font-mono">{reworkRootCode}</span></div>
+                    {reworkOf
+                      ? <div>Mã đơn mới sẽ là <span className="font-mono font-bold">{reworkOf.nextCode}</span>. Khách không trả tiền cho đơn này. Nội dung đã chép từ đơn gốc — sửa lại nếu cần.</div>
+                      : <div>Khách không trả tiền cho đơn này; các ô tiền/phí được ẩn.</div>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-8">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Nguyên nhân phải làm lại <span className="text-red-500">*</span></label>
+                    <textarea
+                      rows={2}
+                      className="w-full border border-orange-300 rounded-md px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-[#e65100] focus:border-transparent bg-white"
+                      value={formData.rework_reason || ''}
+                      onChange={(e) => handleChange('rework_reason', e.target.value)}
+                      placeholder="VD: In lệch màu, sai nội dung, bế hỏng, cán màng bị bong..."
+                    ></textarea>
+                  </div>
+                  <div className="md:col-span-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Chi phí làm lại (đ)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-full border border-orange-300 rounded-md px-3 py-2 text-sm font-bold text-red-700 bg-white focus:ring-2 focus:ring-[#e65100] focus:border-transparent"
+                      value={formData.rework_cost ?? 0}
+                      onChange={(e) => handleChange('rework_cost', Math.max(0, parseFloat(e.target.value) || 0))}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">Trừ vào doanh số tháng khi đơn hoàn thành (mốc thưởng sản xuất + doanh thu công ty). Không trừ doanh số NVKD.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Customer Info - Full Width (Moved to Top) */}
             <div className="lg:col-span-12 bg-blue-50 p-4 rounded-lg border border-blue-100">
               <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><i className="fa-solid fa-user"></i> Khách hàng</h4>
@@ -290,7 +361,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
                         {/* Conditional Fee Input */}
                         {isChecked && (item.feeKey || item.key === 'has_gia_cong_ngoai') && (
                           <div className="ml-7 animate-fade-in-down space-y-2">
-                            {item.feeKey && (
+                            {item.feeKey && !isRework && (
                               <div className="flex items-center border border-gray-300 rounded-md overflow-hidden bg-white">
                                 <input
                                   type="number"
@@ -340,7 +411,8 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
                 </div>
               </div>
 
-              {/* Payment */}
+              {/* Payment — ẩn với đơn sản xuất lại (khách không trả tiền) */}
+              {!isRework && (
               <div className="bg-[#e0f2f1] p-5 rounded-lg border border-[#b2dfdb]">
                 <h4 className="font-bold text-[#00695c] mb-4 text-lg border-b border-[#b2dfdb] pb-2 flex justify-between">
                   <span><i className="fa-solid fa-file-invoice-dollar"></i> Thanh toán</span>
@@ -429,6 +501,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
           </div>
@@ -439,9 +512,9 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSubmit, init
             </button>
             <button
               onClick={handleSave}
-              className="px-6 py-2.5 bg-[#00796b] text-white rounded-lg hover:bg-[#00695c] font-bold shadow-md hover:shadow-lg transition-all flex items-center"
+              className={`px-6 py-2.5 text-white rounded-lg font-bold shadow-md hover:shadow-lg transition-all flex items-center ${isRework ? 'bg-[#e65100] hover:bg-[#bf360c]' : 'bg-[#00796b] hover:bg-[#00695c]'}`}
             >
-              <i className="fa-solid fa-save mr-2"></i> {initialData ? 'Cập Nhật Đơn Hàng' : 'Tạo Đơn Hàng'}
+              <i className={`fa-solid ${isRework && !isEdit ? 'fa-rotate' : 'fa-save'} mr-2`}></i> {isRework && !isEdit ? 'Tạo Đơn Làm Lại' : isEdit ? 'Cập Nhật Đơn Hàng' : 'Tạo Đơn Hàng'}
             </button>
           </div>
         </div>
