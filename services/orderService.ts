@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { Order, OrderStatus, ReworkLink } from '../types';
 import { REWORK_TAB } from '../constants';
+import { prevMonthRange } from '../utils/tabCounts';
 
 /**
  * Gắn liên kết đơn sản xuất lại cho một danh sách đơn (xem setup_rework_orders.sql):
@@ -141,6 +142,7 @@ export const orderService = {
             sortOrder?: string;
             filterMonth?: number; // 1-12
             filterYear?: number;  // e.g. 2026
+            includeCarryOver?: boolean; // kèm đơn tháng liền trước chưa xong
         }
     ) {
         let query = supabase
@@ -160,7 +162,7 @@ export const orderService = {
 
         // Apply Additional Filters
         if (additionalFilters) {
-            const { searchTerm, fromDate, toDate, paymentVerifyStatus, sortOrder, filterMonth, filterYear } = additionalFilters;
+            const { searchTerm, fromDate, toDate, paymentVerifyStatus, sortOrder, filterMonth, filterYear, includeCarryOver } = additionalFilters;
 
             if (searchTerm) {
                 // 1. Find matching customers first
@@ -201,6 +203,16 @@ export const orderService = {
                     query = query.gte('completed_at', startOfMonth.toISOString());
                     query = query.lte('completed_at', endOfMonth.toISOString());
                     query = query.gte('created_at', '2026-03-01T00:00:00.000Z');
+                } else if (includeCarryOver && !searchTerm) {
+                    // Gồm đơn tồn: (đơn tạo trong tháng đang chọn) HOẶC (đơn tháng liền
+                    // trước chưa xong). Đơn tháng trước đã HoanThanh/Huy thì không kéo
+                    // theo, nếu không tab "Đã hoàn thành"/"Đã hủy" sẽ phình gấp đôi.
+                    // Bỏ qua khi đang tìm kiếm: search đã chiếm tham số or= của truy vấn.
+                    const { prevStart, prevEnd } = prevMonthRange(filterMonth, filterYear);
+                    query = query.or(
+                        `and(created_at.gte.${startOfMonth.toISOString()},created_at.lte.${endOfMonth.toISOString()}),` +
+                        `and(created_at.gte.${prevStart.toISOString()},created_at.lte.${prevEnd.toISOString()},status.not.in.("HoanThanh","Huy"))`
+                    );
                 } else {
                     // Old method: filter by created_at
                     query = query.gte('created_at', startOfMonth.toISOString());
@@ -256,7 +268,9 @@ export const orderService = {
                 case 'Nhận File':
                     // Include 'Moi' (New), 'TiepNhan', and 'NhanFile'
                     // This creates a bucket for everything from "Just Created" up to "Ready for Processing"
-                    query = query.or('status.eq.Moi,status.eq.TiepNhan,status.eq.NhanFile');
+                    // Dùng .in() thay .or(): nhánh "gồm đơn tồn tháng trước" ở trên đã
+                    // chiếm tham số or= của truy vấn, hai or= trong một query dễ sinh lỗi.
+                    query = query.in('status', ['Moi', 'TiepNhan', 'NhanFile']);
                     break;
                 case 'Xử lý File':
                     query = query.eq('status', 'XuLyFile');
@@ -286,7 +300,7 @@ export const orderService = {
                     // Wait, App.tsx line 350 maps 'Đã hoàn thành' -> 'HoanThanh'.
                     // App.tsx line 364: if targetStatus === 'HoanThanh' return HoanThanh || DaGiaoHang.
                     // So we must include both here to match Client behavior.
-                    query = query.or('status.eq.HoanThanh,status.eq.DaGiaoHang');
+                    query = query.in('status', ['HoanThanh', 'DaGiaoHang']);
                     break;
                 case 'Tạm ngưng':
                     query = query.eq('status', 'TamNgung');
@@ -318,10 +332,10 @@ export const orderService = {
 
                 // Legacy Groups if still used
                 case 'In ấn': // Old group
-                    query = query.or('status.eq.BinhFile,status.eq.In');
+                    query = query.in('status', ['BinhFile', 'In']);
                     break;
                 case 'Gia công': // Old group
-                    query = query.or('status.eq.ThanhPham,status.eq.DongGoi,status.eq.ChoGiaoHang');
+                    query = query.in('status', ['ThanhPham', 'DongGoi', 'ChoGiaoHang']);
                     break;
                 case 'Giao hàng':
                     query = query.eq('status', 'GiaoHang');
@@ -573,6 +587,24 @@ export const orderService = {
         }
 
         const { data, error } = await query;
+        if (error) throw error;
+        return data as Partial<Order>[];
+    },
+
+    // GET đơn tháng LIỀN TRƯỚC còn chưa xong (cho số xanh trên tab).
+    // Cùng bộ cột với getAllOrderStatuses để đổ qua chung buildTabCounts().
+    // "Chưa xong" = status khác HoanThanh và khác Huy; đơn Đã giao hàng / Tạm ngưng
+    // vẫn tính là tồn (đã chốt với người dùng).
+    async getPrevMonthPendingStatuses(filterMonth: number, filterYear: number) {
+        const { prevStart, prevEnd } = prevMonthRange(filterMonth, filterYear);
+
+        const { data, error } = await supabase
+            .from('orders')
+            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status, rework_of_order_id')
+            .gte('created_at', prevStart.toISOString())
+            .lte('created_at', prevEnd.toISOString())
+            .not('status', 'in', '("HoanThanh","Huy")');
+
         if (error) throw error;
         return data as Partial<Order>[];
     }

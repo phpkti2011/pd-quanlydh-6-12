@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useDebounce } from './hooks/useDebounce';
 import { COLORS, REWORK_TAB } from './constants';
 import { orderService, buildReworkDraft } from './services/orderService';
+import { buildTabCounts, prevMonthLabel } from './utils/tabCounts';
 import { supabase } from './services/supabaseClient';
 import { authService } from './services/auth';
 import { dashboardService } from './services/dashboardService';
@@ -62,6 +63,8 @@ const App: React.FC = () => {
   // Stats temporarily disabled or need new service
   const [stats, setStats] = useState<any>(null);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  // Số đơn tháng LIỀN TRƯỚC còn chưa xong, hiện thành số xanh trên tab
+  const [carryOverCounts, setCarryOverCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
 
   // Modals State
@@ -123,6 +126,8 @@ const App: React.FC = () => {
   const now = new Date();
   const [orderMonth, setOrderMonth] = useState(now.getMonth() + 1); // 1-12
   const [orderYear, setOrderYear] = useState(now.getFullYear());
+  // Hiện kèm đơn tháng liền trước chưa xong vào danh sách của tháng đang chọn
+  const [includeCarryOver, setIncludeCarryOver] = useState(false);
 
   // Fetch Sales Reps on Mount
   useEffect(() => {
@@ -211,42 +216,20 @@ const App: React.FC = () => {
         sortOrder: startSort,
         filterMonth: orderMonth,
         filterYear: orderYear,
+        includeCarryOver,
       });
       setOrders(data);
       setTotalOrders(count || 0);
 
-      // 2. Fetch Lightweight Statuses for Tab Counts (filtered by same month)
-      const allStatusData = await orderService.getAllOrderStatuses(orderMonth, orderYear);
-
-      // Đơn sản xuất lại chỉ đếm ở tab riêng; mọi tab trạng thái / công đoạn đếm đơn thường
-      const normalOrders = allStatusData.filter((o: any) => !o.rework_of_order_id);
-      const newTabCounts: Record<string, number> = {
-        all: allStatusData.length,
-        xuat_hoa_don: normalOrders.filter((o: any) => o.vat_amount > 0 && o.status !== 'Huy').length,
-        nhan_file: normalOrders.filter((o: any) => ['Moi', 'TiepNhan', 'NhanFile'].includes(o.status)).length,
-        xu_ly_file: normalOrders.filter((o: any) => o.status === 'XuLyFile').length,
-        binh_file: normalOrders.filter((o: any) => o.status === 'BinhFile').length,
-        in: normalOrders.filter((o: any) => o.status === 'In').length,
-        thanh_pham: normalOrders.filter((o: any) => o.status === 'ThanhPham').length,
-        dong_goi: normalOrders.filter((o: any) => o.status === 'DongGoi').length,
-        cho_giao_hang: normalOrders.filter((o: any) => o.status === 'ChoGiaoHang').length,
-        da_giao_hang: normalOrders.filter((o: any) => o.status === 'DaGiaoHang').length,
-        hoan_thanh: normalOrders.filter((o: any) => o.status === 'HoanThanh').length,
-        gap: normalOrders.filter((o: any) => o.is_urgent && o.status !== 'Huy' && o.status !== 'HoanThanh').length,
-        huy: normalOrders.filter((o: any) => o.status === 'Huy').length,
-        tam_ngung: normalOrders.filter((o: any) => o.status === 'TamNgung').length,
-
-        // Task Counts
-        thiet_ke: normalOrders.filter((o: any) => o.has_design).length,
-        in_kho_lon: normalOrders.filter((o: any) => o.has_large_print).length,
-        be_demi: normalOrders.filter((o: any) => o.has_be_demi).length,
-        gia_cong_ngoai: normalOrders.filter((o: any) => o.has_gia_cong_ngoai).length,
-        ep_kim: normalOrders.filter((o: any) => o.has_ep_kim).length,
-
-        // Đơn sản xuất lại đang làm (chưa xong, chưa hủy)
-        san_xuat_lai: allStatusData.filter((o: any) => o.rework_of_order_id && o.status !== 'HoanThanh' && o.status !== 'Huy').length,
-      };
-      setTabCounts(newTabCounts);
+      // 2. Fetch Lightweight Statuses for Tab Counts.
+      // Hai tập: đơn trong tháng đang chọn (số đỏ) và đơn tháng liền trước còn
+      // chưa xong (số xanh). Cùng đi qua buildTabCounts để chỉ có MỘT bộ công thức.
+      const [monthRows, prevMonthRows] = await Promise.all([
+        orderService.getAllOrderStatuses(orderMonth, orderYear),
+        orderService.getPrevMonthPendingStatuses(orderMonth, orderYear),
+      ]);
+      setTabCounts(buildTabCounts(monthRows));
+      setCarryOverCounts(buildTabCounts(prevMonthRows));
 
       // 3. Keep fetching Dashboard Stats if needed for other charts (revenue etc), but don't overwrite tabCounts
       const dashboardStats = await dashboardService.getStats('month');
@@ -265,7 +248,7 @@ const App: React.FC = () => {
       setCurrentPage(1);
       refreshOrders(1);
     }
-  }, [currentTab, session, selectedSalesRep, debouncedSearchTerm, fromDate, toDate, paymentVerifyStatus, startSort, orderMonth, orderYear]); // Trigger on any filter change
+  }, [currentTab, session, selectedSalesRep, debouncedSearchTerm, fromDate, toDate, paymentVerifyStatus, startSort, orderMonth, orderYear, includeCarryOver]); // Trigger on any filter change
 
 
   // Reset Sub-tab when Main Tab changes
@@ -687,6 +670,12 @@ const App: React.FC = () => {
           onSubTabChange={setCurrentSubTab}
           counts={tabCounts}
           subTabCounts={subTabCounts}
+          carryOverCounts={carryOverCounts}
+          prevMonthLabel={prevMonthLabel(orderMonth, orderYear)}
+          onCarryOverClick={(tabKey) => {
+            setCurrentTab(tabKey);
+            setIncludeCarryOver(true);
+          }}
           userRole={userRole}
         />
 
@@ -769,6 +758,19 @@ const App: React.FC = () => {
                 })}
               </select>
             </div>
+
+            {/* Đơn tháng trước chưa xong: cho xem kèm vào danh sách tháng này */}
+            {(carryOverCounts.all || 0) > 0 && (
+              <label className="flex items-center gap-1.5 mt-1 cursor-pointer text-[11px] font-bold text-[#2563eb] hover:underline">
+                <input
+                  type="checkbox"
+                  checked={includeCarryOver}
+                  onChange={(e) => setIncludeCarryOver(e.target.checked)}
+                  className="accent-[#2563eb] cursor-pointer"
+                />
+                Gồm đơn tồn {prevMonthLabel(orderMonth, orderYear)} ({carryOverCounts.all})
+              </label>
+            )}
           </div>
 
           {/* 5. Sort */}
@@ -834,6 +836,7 @@ const App: React.FC = () => {
                 const resetNow = new Date();
                 setOrderMonth(resetNow.getMonth() + 1);
                 setOrderYear(resetNow.getFullYear());
+                setIncludeCarryOver(false);
               }}
               className="w-9 h-9 rounded flex items-center justify-center bg-gray-400 text-white hover:bg-gray-500 shadow-sm transition-all"
               title="Xóa bộ lọc"

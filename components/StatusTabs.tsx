@@ -10,40 +10,45 @@ interface StatusTabsProps {
     onSubTabChange?: (subTab: string) => void;
     counts: Record<string, number>;
     subTabCounts?: Record<string, number>;
+    // Số đơn tháng liền trước còn chưa xong, hiện thành badge XANH cạnh badge đỏ
+    carryOverCounts?: Record<string, number>;
+    prevMonthLabel?: string; // vd "tháng 9"
+    onCarryOverClick?: (tabKey: string) => void;
     userRole: UserRole;
 }
 
-const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, currentSubTab, onSubTabChange, counts, subTabCounts = {}, userRole }) => {
+// Nhãn tab -> khóa đếm trong counts/carryOverCounts (xem utils/tabCounts.ts).
+// Để ở ngoài component vì nút toggle trên mobile cũng cần tra khóa này.
+const COUNT_KEY_BY_LABEL: Record<string, string> = {
+    'Tất cả': 'all',
+    'Xuất hóa đơn': 'xuat_hoa_don',
+    'Nhận File': 'nhan_file',
+    'Xử lý File': 'xu_ly_file',
+    'Bình File': 'binh_file',
+    'In': 'in',
+    'Thành Phẩm': 'thanh_pham',
+    'Đóng gói': 'dong_goi',
+    'Chờ giao hàng': 'cho_giao_hang',
+    'Đã giao hàng': 'da_giao_hang',
+    'Đã hoàn thành': 'hoan_thanh', // Updated to match screenshot "Đã hoàn thành"
+    'Hoàn thành': 'hoan_thanh',     // Fallback if key differs
+    'Gấp': 'gap',
+    'Đã hủy': 'huy',
+    'Tạm ngưng': 'tam_ngung',
+    'Thiết Kế': 'thiet_ke',
+    'In Khổ Lớn': 'in_kho_lon',
+    'Bế Demi': 'be_demi',
+    'Gia công ngoài': 'gia_cong_ngoai',
+    'Ép Kim': 'ep_kim',
+    [REWORK_TAB]: 'san_xuat_lai'
+};
+
+const getCountKey = (label: string): string => COUNT_KEY_BY_LABEL[label] || '';
+
+const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, currentSubTab, onSubTabChange, counts, subTabCounts = {}, carryOverCounts = {} as Record<string, number>, prevMonthLabel = 'tháng trước', onCarryOverClick, userRole }) => {
     const [isExpanded, setIsExpanded] = React.useState(false);
 
     const tabs = useMemo(() => {
-        const getCountKey = (label: string): string => {
-            const map: Record<string, string> = {
-                'Tất cả': 'all',
-                'Xuất hóa đơn': 'xuat_hoa_don',
-                'Nhận File': 'nhan_file',
-                'Xử lý File': 'xu_ly_file',
-                'Bình File': 'binh_file',
-                'In': 'in',
-                'Thành Phẩm': 'thanh_pham',
-                'Đóng gói': 'dong_goi',
-                'Chờ giao hàng': 'cho_giao_hang',
-                'Đã giao hàng': 'da_giao_hang',
-                'Đã hoàn thành': 'hoan_thanh', // Updated to match screenshot "Đã hoàn thành"
-                'Hoàn thành': 'hoan_thanh',     // Fallback if key differs
-                'Gấp': 'gap',
-                'Đã hủy': 'huy',
-                'Tạm ngưng': 'tam_ngung',
-                'Thiết Kế': 'thiet_ke',
-                'In Khổ Lớn': 'in_kho_lon',
-                'Bế Demi': 'be_demi',
-                'Gia công ngoài': 'gia_cong_ngoai',
-                'Ép Kim': 'ep_kim',
-                [REWORK_TAB]: 'san_xuat_lai'
-            };
-            return map[label] || '';
-        };
-
         // First row: Primary workflow tabs
         const row1Labels = [
             "📊 Tổng quan", "Tất cả", "Xuất hóa đơn", "Nhận File", "Xử lý File",
@@ -107,6 +112,22 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         };
     }, [userRole]);
 
+    // Badge XANH: số đơn tháng liền trước chưa xong đang đứng ở tab này.
+    // Bấm vào = mở tab đó và bật "Gồm đơn tồn tháng trước" ở bộ lọc.
+    const renderCarryBadge = (tab: any, size: 'sm' | 'xs') => {
+        const carry = carryOverCounts[tab.countKey] || 0;
+        if (carry <= 0) return null;
+        return (
+            <span
+                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCarryOverClick?.(tab.key); }}
+                title={`${carry} đơn ${prevMonthLabel} chưa xong — bấm để hiện kèm vào danh sách`}
+                className={`ml-1 px-1.5 py-0.5 rounded-full font-bold bg-[#2563eb] text-white hover:bg-[#1d4ed8] ${size === 'xs' ? 'text-[10px]' : 'text-xs'}`}
+            >
+                {carry}
+            </span>
+        );
+    };
+
     const renderTab = (tab: any) => {
         const count = counts[tab.countKey] || 0;
         const isActive = currentTab === tab.key;
@@ -136,6 +157,7 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
                             {count}
                         </span>
                     )}
+                    {renderCarryBadge(tab, 'xs')}
                 </div>
             );
         }
@@ -166,6 +188,7 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
                         {count}
                     </span>
                 )}
+                {renderCarryBadge(tab, 'sm')}
             </div>
         );
     };
@@ -196,6 +219,12 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
     };
 
     const activeSubTabs = getSubTabs(currentTab);
+
+    // Nút toggle trên mobile: tra bằng KHÓA đếm, không phải nhãn tab
+    const mobileCountKey = getCountKey(currentTab);
+    const mobileCount = counts[mobileCountKey] || 0;
+    const mobileCarry = carryOverCounts[mobileCountKey] || 0;
+    const hasCarryOver = (carryOverCounts.all || 0) > 0;
 
     const renderSubTab = (subTab: { key: string, label: string }) => {
         const isActive = currentSubTab === subTab.key;
@@ -248,7 +277,10 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="md:hidden w-full flex items-center justify-between px-4 py-2 bg-gray-50 border border-gray-200 rounded mb-2 text-sm font-bold text-gray-700"
             >
-                <span>{currentTab} {counts[currentTab] ? `(${counts[currentTab]})` : ''}</span>
+                <span>
+                    {currentTab} {mobileCount > 0 ? `(${mobileCount})` : ''}
+                    {mobileCarry > 0 && <span className="ml-1 text-[#2563eb]">+{mobileCarry} tồn</span>}
+                </span>
                 <i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
             </button>
 
@@ -263,6 +295,14 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
                 <div className="flex flex-wrap gap-2 mb-2">
                     {tabs.row2.map(renderTab)}
                 </div>
+
+                {/* Chú giải badge xanh — chỉ hiện khi thật sự có đơn tồn */}
+                {hasCarryOver && (
+                    <div className="text-[11px] text-gray-500 mb-1">
+                        <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#2563eb] align-middle mr-1"></span>
+                        Số xanh = đơn {prevMonthLabel} chưa xong, bấm vào để hiện kèm vào danh sách.
+                    </div>
+                )}
             </div>
 
             {/* Third Row: Sub-Tabs (Conditional) - Always visible if active? Or folded? */}
