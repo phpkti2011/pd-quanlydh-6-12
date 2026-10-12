@@ -1,5 +1,25 @@
 import { Order } from '../types';
 import { LOGO_SVG } from './logoSVG';
+import { PRINT_TERMS_TITLE, PRINT_TERMS_INTRO, PRINT_TERMS_ARTICLES } from './printTerms';
+
+const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Điều khoản in ấn: render từ nguồn duy nhất utils/printTerms.ts (2 cột để vừa phiếu).
+const renderPrintTermsHtml = (): string => `
+    <div class="term-block">
+        <b style="font-size: 9pt; text-transform: uppercase;">${escHtml(PRINT_TERMS_TITLE)}</b>
+        <div style="margin-top: 2px; text-align: justify;">${escHtml(PRINT_TERMS_INTRO)}</div>
+        <div style="column-count: 2; column-gap: 14px; margin-top: 4px; font-size: 7pt; line-height: 1.25; text-align: justify;">
+            ${PRINT_TERMS_ARTICLES.map(a => `
+                <div style="break-inside: avoid-column; margin-bottom: 3px;">
+                    <b>${escHtml(a.title)}</b>
+                    ${a.clauses.map(c => `<div>${escHtml(c.text)}</div>${(c.items || []).map(i => `<div style="padding-left: 8px;">${escHtml(i)}</div>`).join('')}`).join('')}
+                </div>`).join('')}
+        </div>
+        <div style="margin-top: 8px; font-size: 8pt; text-align: right; break-inside: avoid;">
+            <div style="display: inline-block; text-align: center; min-width: 200px;"><b>KHÁCH HÀNG XÁC NHẬN</b><br/><i>(Đã đọc, hiểu và đồng ý điều khoản — ký, ghi rõ họ tên)</i><br/><br/><br/><br/>Ngày ....../....../........</div>
+        </div>
+    </div>`;
 
 export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = 'receipt', customLogo?: string, customBackground?: string) => {
     const isReceipt = type === 'receipt';
@@ -236,33 +256,7 @@ export const generatePrintHTML = (order: Order, type: 'receipt' | 'delivery' = '
                 </div>
             </div>
 
-            <div class="term-block">
-                <b style="font-size: 9pt; text-transform: uppercase;">ĐIỀU KHOẢN IN ẤN:</b><br/>
-                <div style="margin-top: 2px;">
-                    Quý khách hàng khi đặt hàng in các sản phẩm in ấn tại Công Ty TNHH In P&D (sau đây gọi tắt là P&D), đồng nghĩa với việc khách hàng đã được thông báo, đọc hiểu và đồng ý với các điều khoản sau:
-                </div>
-                <div style="margin-top: 4px;">
-                    <b>1. Thông tin khách hàng:</b><br/>
-                    - Khách hàng cam kết các thông tin về nhân thân chính chủ (Họ và tên, số điện thoại, email,...) mà khách hàng sử dụng để liên hệ và làm việc với P&D là hợp pháp. Không có bất kỳ việc sử dụng thông tin cá nhân không chính chủ và bất hợp pháp nào để tạo đơn hàng, nếu có Khách hàng chịu mọi trách nhiệm trước Pháp luật.<br/>
-                    - Công Ty TNHH In P&D không có trách nhiệm phải xác minh, biết hoặc phải biết thông tin của Khách hàng liên hệ với P&D là hợp pháp hay không. Trong trường hợp P&D nhận thấy có bất kỳ bằng chứng nào cho thấy Khách hàng sử dụng thông tin cá nhân trái phép hoặc khi có yêu cầu của cơ quan có thẩm quyền, P&D sẽ bảo lưu quyền của mình: miễn trách nhiệm bồi thường cho Khách hàng và bên thứ ba khác (nếu có); Khách hàng hoàn toàn chịu mọi trách nhiệm trước Pháp luật.<br/>
-                    - Các thông tin về sản phẩm hoặc các thông tin, trao đổi khác có liên quan đến sản phẩm, P&D sẽ liên hệ Khách hàng qua số điện thoại, tài khoản zalo, email, ... mà khách hàng đã cung cấp.
-                </div>
-                 <div style="margin-top: 4px;">
-                    <b>2. Nội dung sản phẩm in:</b><br/>
-                    - Khách hàng cam kết Nội dung sản phẩm in không chứa các nội dung sau:<br/>
-                    a) Tuyên truyền chống Nhà nước Cộng hòa xã hội chủ nghĩa Việt Nam; phá hoại khối đại đoàn kết toàn dân tộc.<br/>
-                    b) Tuyên truyền kích động chiến tranh xâm lược, chủ nghĩa khủng bố, chủ nghĩa li khai, gây hận thù, chia rẽ giữa các dân tộc và nhân dân các nước; kích động bạo lực; truyền bá tư tưởng phản động, lối sống dâm ô, đồi trụy, hành vi tội ác, tệ nạn xã hội, mê tín dị đoan, phá hoại thuần phong mỹ tục.<br/>
-                    c) Tiết lộ bí mật nhà nước, bí mật đời tư của cá nhân và bí mật khác do pháp luật quy định.<br/>
-                    d) Thông tin sai sự thật, xuyên tạc lịch sử, phủ nhận thành tựu cách mạng; xúc phạm dân tộc, danh nhân, anh hùng dân tộc; sử dụng hình ảnh bản đồ Việt Nam nhưng không thể hiện hoặc thể hiện không đúng chủ quyền quốc gia; vu khống, xúc phạm uy tín của cơ quan, tổ chức và danh dự, nhân phẩm của cá nhân.
-                </div>
-                 <div style="margin-top: 4px;">
-                    <b>3. Quyền và trách nhiệm đối với sản phẩm in:</b><br/>
-                    - Khách hàng là người có đầy đủ quyền đặt in, gia công sau in, chế bản đối với các sản phẩm mà khách hàng đặt in tại P&D, và chịu toàn bộ trách nhiệm trước pháp luật cho bất kỳ nghĩa vụ nào đối với cá nhân, tổ chức khác (nếu có).<br/>
-                    - Sản phẩm in không xâm phạm đến quyền sở hữu trí tuệ hoặc quyền và lợi ích hợp pháp của cá nhân, tổ chức khác (nếu có).<br/>
-                    - Sản phẩm in không dùng cho mục đích làm giả giấy tờ của cơ quan nhà nước, trực tiếp hoặc gián tiếp sản xuất hàng giả hoặc phát tán nội dung vi phạm quy định pháp luật.<br/>
-                    - P&D không có trách nhiệm tìm hiểu, xác minh, biết hoặc phải biết mục đích sử dụng dịch vụ của Khách hàng hoặc các nội dung của sản phẩm mà Khách hàng đặt in có vi phạm quyền sở hữu trí tuệ hay các quy định khác của pháp luật có liên quan.
-                </div>
-            </div>
+            ${renderPrintTermsHtml()}
         </div>
         `}
       </div>

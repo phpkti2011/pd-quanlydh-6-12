@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bảng kiểm soát nội dung in – Nội bộ Sale</title>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #5b6475; --line: #d9dde5;
+  --green-bg: #e3f6e8; --green-fg: #146c2e;
+  --yellow-bg: #fff4cc; --yellow-fg: #7a5a00;
+  --red-bg: #fde0e0; --red-fg: #a31616;
+  --black-bg: #2b2b2b; --black-fg: #ffffff;
+  --accent: #0b5cad;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --card: #1b2029; --text: #e6e9ef; --muted: #98a1b3; --line: #2e3542;
+    --green-bg: #17351f; --green-fg: #7ee09a;
+    --yellow-bg: #3b3210; --yellow-fg: #f2d36b;
+    --red-bg: #3d1a1a; --red-fg: #ff9a9a;
+    --black-bg: #000000; --black-fg: #ffffff;
+    --accent: #6cb2ff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --card: #1b2029; --text: #e6e9ef; --muted: #98a1b3; --line: #2e3542;
+  --green-bg: #17351f; --green-fg: #7ee09a;
+  --yellow-bg: #3b3210; --yellow-fg: #f2d36b;
+  --red-bg: #3d1a1a; --red-fg: #ff9a9a;
+  --black-bg: #000000; --black-fg: #ffffff;
+  --accent: #6cb2ff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", Roboto, Arial, sans-serif; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 22px; margin: 4px 0 2px; }
+h2 { font-size: 17px; margin: 28px 0 8px; padding-top: 8px; border-top: 2px solid var(--line); }
+h3 { font-size: 14px; margin: 14px 0 4px; }
+p, li { margin: 4px 0; }
+.sub { color: var(--muted); margin: 0 0 10px; }
+.banner { background: var(--red-bg); color: var(--red-fg); border: 1px solid var(--red-fg); border-radius: 8px; padding: 8px 12px; font-weight: 600; margin: 10px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; }
+nav.toc a { color: var(--accent); text-decoration: none; font-size: 13px; }
+nav.toc a:hover { text-decoration: underline; }
+table { width: 100%; border-collapse: collapse; background: var(--card); font-size: 13px; }
+th, td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; }
+th { background: var(--bg); position: sticky; top: 0; z-index: 1; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-weight: 700; white-space: nowrap; font-size: 12px; }
+.g { background: var(--green-bg); color: var(--green-fg); }
+.y { background: var(--yellow-bg); color: var(--yellow-fg); }
+.r { background: var(--red-bg); color: var(--red-fg); }
+.k { background: var(--black-bg); color: var(--black-fg); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.tools input[type=search] { flex: 1 1 240px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; }
+.tools button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); cursor: pointer; font: inherit; }
+.tools button[aria-pressed="true"] { outline: 2px solid var(--accent); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+.say { border-left: 4px solid var(--accent); background: var(--bg); padding: 6px 10px; margin: 6px 0; border-radius: 4px; }
+.warn { color: var(--yellow-fg); background: var(--yellow-bg); padding: 0 4px; border-radius: 3px; }
+.form td { height: 30px; }
+.small { font-size: 12px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  :root { --bg: #fff; --card: #fff; --text: #000; --muted: #333; --line: #888; }
+  body { font-size: 11px; background: #fff; color: #000; }
+  .tools, nav.toc, .noprint { display: none !important; }
+  th { position: static; }
+  h2 { break-after: avoid; }
+  tr, .card { break-inside: avoid; }
+  .badge { border: 1px solid #000; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>BẢNG KIỂM SOÁT NỘI DUNG IN – DÙNG CHO SALE</h1>
+<p class="sub">Công ty TNHH In P&amp;D · Phân loại đơn trước khi nhận · Phiên bản 1.0 (10/2026)</p>
+<div class="banner">TÀI LIỆU NỘI BỘ – KHÔNG GỬI, KHÔNG CHO KHÁCH XEM.</div>
+<p class="small">Đây là hướng dẫn nghiệp vụ nội bộ, <b>không phải tư vấn pháp lý chính thức</b>. Các chỗ đánh dấu <span class="warn">⚠</span> cần luật sư / Sở Thông tin và Truyền thông xác nhận. Pháp luật đang thay đổi (Luật sửa đổi Luật Xuất bản có hiệu lực từ 1/3/2027; dự thảo văn bản thay Nghị định 60/2014) — Quản lý rà lại tài liệu này khi có văn bản chính thức.</p>
+
+<nav class="toc noprint">
+  <a href="#b1">1. Nguyên tắc</a>
+  <a href="#b2">2. Bốn mức</a>
+  <a href="#b3">3. Bảng phân loại sản phẩm</a>
+  <a href="#b4">4. Dấu hiệu cảnh báo</a>
+  <a href="#b5">5. Câu hỏi nhanh</a>
+  <a href="#b6">6. Giấy tờ cần xin</a>
+  <a href="#b7">7. Mẫu câu giao tiếp</a>
+  <a href="#b8">8. Phiếu xác nhận (đơn Vàng)</a>
+  <a href="#b9">9. Nhật ký từ chối</a>
+  <a href="#b10">10. Lưu ý pháp lý</a>
+</nav>
+
+<h2 id="b1">1. Nguyên tắc 4 bước</h2>
+<div class="grid2">
+  <div class="card"><b>① HỎI</b><br>Ai đặt (cá nhân/công ty)? In để làm gì? Có bán/phát hành không?</div>
+  <div class="card"><b>② XEM</b><br>Xem kỹ nội dung và file: chữ, hình, logo, mã số, kích thước, chất liệu.</div>
+  <div class="card"><b>③ PHÂN LOẠI</b><br>Tra bảng mục 3 → Xanh / Vàng / Đỏ / Đen. Không rõ → coi như mức cao hơn.</div>
+  <div class="card"><b>④ LƯU</b><br>Gắn vào mã đơn: phiếu đặt in, file/mẫu khách duyệt (có xác nhận), giấy tờ khách đưa.</div>
+</div>
+<div class="card"><b>Quy tắc vàng:</b> nghi ngờ thì <b>dừng và hỏi Quản lý</b>. Sale <b>không tự quyết đơn Đỏ</b>, không tự "du di" đơn Đen. Luôn cho khách đọc/đồng ý Điều khoản in ấn và <b>duyệt mẫu bằng chữ ký hoặc tin nhắn trước khi in</b>.</div>
+
+<h2 id="b2">2. Bốn mức xử lý</h2>
+<div class="tablewrap">
+<table>
+<thead><tr><th>Mức</th><th>Ý nghĩa</th><th>Việc phải làm</th><th>Ai quyết</th></tr></thead>
+<tbody>
+<tr><td><span class="badge g">🟢 XANH</span></td><td>Rủi ro thấp</td><td>Nhận bình thường. Cho khách xem Điều khoản, duyệt mẫu, lưu file duyệt.</td><td>Sale</td></tr>
+<tr><td><span class="badge y">🟡 VÀNG</span></td><td>Nhận có điều kiện</td><td>Hỏi kỹ + xin giấy tờ/cam kết (mục 6, 8). Chưa đủ giấy tờ thì <b>chưa sản xuất</b>. Lưu hồ sơ.</td><td>Sale (khi đủ giấy tờ); thiếu/nghi ngờ → Quản lý</td></tr>
+<tr><td><span class="badge r">🔴 ĐỎ</span></td><td>Rủi ro cao / cần giấy phép</td><td><b>Dừng.</b> Báo Quản lý/Giám đốc. Mặc định không nhận, trừ khi khách có đủ hồ sơ hợp lệ và xưởng đủ điều kiện pháp lý.</td><td>Quản lý / Giám đốc</td></tr>
+<tr><td><span class="badge k">⛔ ĐEN</span></td><td>Cấm / dấu hiệu vi phạm</td><td><b>Từ chối ngay</b> (dùng mẫu câu mục 7). Ghi nhật ký (mục 9). Báo Quản lý trong ngày. Không nhận cọc; nếu đã nhận → hoàn theo Điều 6.3.</td><td>Từ chối – Quản lý biết</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="b3">3. Bảng phân loại sản phẩm</h2>
+<div class="tools noprint">
+  <input type="search" id="q" placeholder="Tìm nhanh: decal, sách, lịch, hóa đơn, tem, ảnh…" aria-label="Tìm nhanh">
+  <button type="button" data-lv="all" aria-pressed="true">Tất cả</button>
+  <button type="button" data-lv="g" aria-pressed="false">🟢 Xanh</button>
+  <button type="button" data-lv="y" aria-pressed="false">🟡 Vàng</button>
+  <button type="button" data-lv="r" aria-pressed="false">🔴 Đỏ</button>
+  <button type="button" data-lv="k" aria-pressed="false">⛔ Đen</button>
+</div>
+<p class="small">Mọi đơn Vàng/Đỏ đều phải lưu: phiếu đặt in + file/mẫu khách duyệt + giấy tờ liên quan, gắn vào mã đơn. Một nhóm có thể có nhiều mức tùy nội dung — lấy mức <b>cao nhất</b> trong các dấu hiệu.</p>
+<div class="tablewrap">
+<table id="main">
+<thead><tr><th style="width:3%">#</th><th style="width:22%">Nhóm sản phẩm / ví dụ</th><th style="width:9%">Mức</th><th style="width:32%">Điều kiện nhận / cách xử lý</th><th style="width:17%">Giấy tờ cần xin</th><th style="width:17%">Lưu ý &amp; căn cứ</th></tr></thead>
+<tbody>
+
+<tr data-lv="g"><td>1</td><td><b>Danh thiếp, thiệp mời / cảm ơn / cưới</b><br>namecard, card visit</td><td><span class="badge g">🟢 Xanh</span></td><td>Nhận bình thường. Khách duyệt mẫu. <b>Nâng lên 🔴/⛔</b> nếu danh thiếp ghi chức danh cơ quan nhà nước, công an, quân đội, báo chí… mà khách không chứng minh được.</td><td>Không (đơn Xanh).</td><td>Chống giả mạo chức danh (Điều 3.2.đ, 3.2.i).</td></tr>
+
+<tr data-lv="g y"><td>2</td><td><b>Tờ rơi, tờ gấp, áp-phích, poster, banner, standee, backdrop, bạt hiflex quảng cáo của doanh nghiệp</b></td><td><span class="badge g">🟢 Xanh</span><br><span class="badge y">🟡 Vàng</span></td><td>🟢 nếu ngành thông thường. 🟡 nếu <b>ngành hạn chế quảng cáo</b>: thuốc, thực phẩm chức năng, mỹ phẩm, khám chữa bệnh/thẩm mỹ, bất động sản, tài chính/tín dụng, giáo dục/du học/xuất khẩu lao động, rượu bia. Kiểm tra câu chữ cam kết "số 1", "cam kết khỏi bệnh", "lãi suất cao"…</td><td>GPKD; giấy xác nhận nội dung quảng cáo / giấy công bố sản phẩm nếu thuộc diện; với BĐS: hồ sơ đủ điều kiện mở bán.</td><td>Sau Nghị định 72/2022, áp-phích/tờ rơi/tờ gấp quảng cáo <b>không</b> phải xuất bản phẩm. Luật Quảng cáo. <span class="warn">⚠</span></td></tr>
+
+<tr data-lv="y k"><td>3</td><td><b>Băng rôn, khẩu hiệu, phông nền sự kiện, lễ hội, tuyên truyền</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge k">⛔ Đen</span></td><td>🟡: hỏi đơn vị tổ chức, xin văn bản/giấy giới thiệu; khẩu hiệu chính trị – xã hội phải đúng chuẩn, không tự sáng tác. <b>⛔</b> nếu nội dung phản đối, kêu gọi tụ tập, kích động.</td><td>Giấy giới thiệu / văn bản của đơn vị tổ chức (có dấu).</td><td>Điều 3.2.a–d.</td></tr>
+
+<tr data-lv="y r"><td>4</td><td><b>Decal, sticker, tem nhãn sản phẩm, nhãn chai/hộp, tem bảo hành</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>🟡: thương hiệu là của khách → xin GPKD; thương hiệu của bên khác → bắt buộc giấy ủy quyền/hợp đồng. Thực phẩm/thuốc/mỹ phẩm: xin giấy công bố. Khách chịu trách nhiệm nội dung nhãn. <b>🔴</b>: tem chống giả, tem hologram, tem có mã bảo mật/seri (cần giấy phép in tương ứng) — mặc định chuyển Quản lý.</td><td>GPKD; giấy chứng nhận nhãn hiệu / ủy quyền / hợp đồng gia công; giấy công bố sản phẩm.</td><td>Nghị định 43/2017 về nhãn hàng hóa. Xưởng có giấy phép in tem chống giả không? <span class="warn">⚠</span></td></tr>
+
+<tr data-lv="y"><td>5</td><td><b>Bao bì: hộp giấy, túi giấy, túi nilon, hộp mỹ phẩm/thực phẩm</b></td><td><span class="badge y">🟡 Vàng</span></td><td>Như nhóm 4. Hàng gia công cho thương hiệu khác (OEM): <b>bắt buộc</b> hợp đồng/ủy quyền. Nội dung thành phần/công dụng do khách chịu trách nhiệm.</td><td>GPKD; ủy quyền nhãn hiệu; công bố sản phẩm.</td><td>—</td></tr>
+
+<tr data-lv="g y"><td>6</td><td><b>Catalog, brochure, profile công ty, menu, hướng dẫn sử dụng, biểu mẫu, sổ sách, hợp đồng mẫu</b></td><td><span class="badge g">🟢 Xanh</span><br><span class="badge y">🟡 Vàng</span></td><td>🟢: tài liệu giới thiệu/hướng dẫn/biểu mẫu của doanh nghiệp. 🟡 nếu thuộc ngành hạn chế ở nhóm 2, hoặc dùng ảnh/nhạc/font nguồn lạ → <b>hỏi nguồn bản quyền</b>, ghi vào phiếu.</td><td>Ngành hạn chế: như nhóm 2.</td><td>Nghị định 72/2022: tài liệu giới thiệu/quảng cáo/hướng dẫn sử dụng không phải xuất bản phẩm. <span class="warn">⚠</span></td></tr>
+
+<tr data-lv="y r"><td>7</td><td><b>Voucher, coupon, thẻ thành viên, thẻ tích điểm, vé sự kiện, vé gửi xe</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>🟡: xin xác nhận của đơn vị phát hành. 🔴 nếu có mệnh giá quy đổi tiền, mã QR/số seri bảo mật, hoặc giống giấy tờ có giá.</td><td>GPKD; xác nhận của đơn vị phát hành/tổ chức sự kiện.</td><td>Nguy cơ làm giả vé/chứng từ.</td></tr>
+
+<tr data-lv="r g"><td>8</td><td><b>Hóa đơn, biên lai thu phí/lệ phí, phiếu có giá trị kế toán – thuế</b></td><td><span class="badge r">🔴 Đỏ</span><br><span class="badge g">🟢 nội bộ</span></td><td>🔴: chuyển Quản lý. Hóa đơn đã chuyển sang điện tử từ 1/7/2022, đa số khách không cần in giấy. Chỉ phiếu thu/chi/giao hàng <b>nội bộ</b> (không có giá trị hóa đơn) mới là 🟢.</td><td>Hồ sơ của tổ chức đặt in, văn bản cho phép tự in/đặt in (nếu có).</td><td>Nghị định 123/2020 và văn bản liên quan. <span class="warn">⚠</span></td></tr>
+
+<tr data-lv="g y"><td>9</td><td><b>Sổ tay, notebook, lịch (bloc / treo tường / để bàn), kẹp file, quà tặng in logo</b></td><td><span class="badge g">🟢 Xanh</span><br><span class="badge y">🟡 Vàng (lịch)</span></td><td>🟢 quà tặng/sổ tay. <b>Lịch → 🟡</b>: kiểm tra ngày lễ, âm lịch, bản đồ, ảnh lãnh tụ, thông tin sai sự thật. Lịch bán ra thị trường (không phải quà tặng) → hỏi Quản lý.</td><td>Lịch bán ra thị trường: hỏi Quản lý về giấy phép.</td><td>Lịch có thể thuộc diện xuất bản phẩm. <span class="warn">⚠</span> xác nhận Sở TT&amp;TT.</td></tr>
+
+<tr data-lv="g y k"><td>10</td><td><b>Ảnh, tranh, canvas, photobook, album, ảnh kỷ niệm</b></td><td><span class="badge g">🟢 Xanh</span><br><span class="badge y">🟡 Vàng</span></td><td>🟢 ảnh cá nhân/gia đình của chính khách. 🟡 ảnh có người khác, ảnh/tranh của tác giả khác, ảnh tải từ mạng, tranh để bán → hỏi nguồn, khách cam kết bản quyền & sự đồng ý của người trong ảnh. <b>⛔</b> ảnh khỏa thân, đồi trụy, bạo lực.</td><td>Cam kết bản quyền (phiếu mục 8); giấy cho phép của tác giả nếu là tác phẩm người khác.</td><td>Điều 3.2.b, e, h. Quyền hình ảnh (BLDS Điều 32).</td></tr>
+
+<tr data-lv="y r"><td>11</td><td><b>In lên áo, ly, mũ, gối, móc khóa, cốc, quà cá nhân hóa</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>🟡 nếu có logo/nhân vật/hình người nổi tiếng/thương hiệu (hoạt hình, anime, câu lạc bộ bóng đá…): chỉ nhận khi có ủy quyền/license. 🔴 nếu số lượng lớn có dấu hiệu bán lại hàng nhái. Logo/hình của chính khách → 🟢.</td><td>Giấy ủy quyền / license sử dụng hình ảnh, nhãn hiệu.</td><td>Hàng nhái, xâm phạm quyền SHTT (Điều 3.2.e).</td></tr>
+
+<tr data-lv="r g"><td>12</td><td><b>Kỷ yếu, tập san, nội san, tài liệu hội nghị/hội thảo, giáo trình, bản tin, truyện, thơ, tiểu thuyết, sách ảnh, sách tự xuất bản, báo, tạp chí</b></td><td><span class="badge r">🔴 Đỏ</span><br><span class="badge g">🟢 ngoại lệ</span></td><td>🔴: cần <b>giấy phép xuất bản tài liệu không kinh doanh</b> (Sở TT&amp;TT) hoặc <b>quyết định xuất bản + hợp đồng với nhà xuất bản</b>; xưởng phải có giấy phép in xuất bản phẩm. Mặc định chuyển Quản lý / từ chối. <b>Ngoại lệ 🟢:</b> luận văn, khóa luận, báo cáo, hồ sơ học tập cá nhân đóng quyển (không phát hành); tài liệu hướng dẫn/giới thiệu sản phẩm của doanh nghiệp (nhóm 6).</td><td>Giấy phép xuất bản / quyết định xuất bản; hợp đồng xuất bản; xác nhận nơi in.</td><td>Luật Xuất bản; Nghị định 60/2014, 25/2018, 72/2022. <span class="warn">⚠</span> Xưởng có giấy phép in xuất bản phẩm không?</td></tr>
+
+<tr data-lv="y r"><td>13</td><td><b>Photocopy / in lại sách, giáo trình, tài liệu có bản quyền</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>🟡 một phần nhỏ, học tập cá nhân. 🔴 nguyên quyển, số lượng nhiều, hoặc để bán lại → từ chối/chuyển Quản lý.</td><td>Cam kết mục đích sử dụng (phiếu mục 8).</td><td>Xâm phạm quyền tác giả.</td></tr>
+
+<tr data-lv="k"><td>14</td><td><b>Giấy tờ của cơ quan nhà nước / tổ chức:</b> CCCD, hộ chiếu, GPLX, đăng ký xe, sổ đỏ, giấy khai sinh, bằng tốt nghiệp, chứng chỉ, thẻ công an/quân nhân/nhà báo, con dấu, công văn có quốc huy</td><td><span class="badge k">⛔ Đen</span></td><td><b>Không in, không làm mới.</b> (Photocopy bản chính của chính khách để làm hồ sơ → 🟢, khách đưa bản gốc trực tiếp.)</td><td>—</td><td>Làm giả con dấu, tài liệu (BLHS 2015). Điều 3.2.đ.</td></tr>
+
+<tr data-lv="y r k"><td>15</td><td><b>Giấy khen, bằng khen, giấy chứng nhận, thẻ nhân viên / học sinh của đơn vị</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>🟡: xin giấy giới thiệu/dấu đơn vị, in theo mẫu của đơn vị. Có quốc huy hoặc mô phỏng mẫu cơ quan nhà nước → 🔴; thẻ giả danh cơ quan nhà nước → ⛔.</td><td>Giấy giới thiệu có dấu; GPKD / quyết định thành lập đơn vị.</td><td>Điều 3.2.đ, i.</td></tr>
+
+<tr data-lv="y r"><td>16</td><td><b>Quốc kỳ, Đảng kỳ, cờ, ảnh lãnh tụ, bản đồ Việt Nam</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>Chuyển Quản lý kiểm tra quy cách (tỷ lệ, màu sắc, vị trí). <b>Bản đồ</b> phải thể hiện đủ Hoàng Sa, Trường Sa, đúng chủ quyền; sai/thiếu → từ chối.</td><td>Giấy giới thiệu của đơn vị đặt in (nếu là cơ quan/tổ chức).</td><td>Điều 3.2.d, i.</td></tr>
+
+<tr data-lv="k r"><td>17</td><td><b>Tiền, tiền âm phủ / đạo cụ giống thật, giấy tờ có giá, cổ phiếu, séc, tem bưu chính</b></td><td><span class="badge k">⛔ Đen</span></td><td>Từ chối. Đạo cụ chỉ xem xét (🔴, Quản lý duyệt) khi khác rõ kích thước/hoa văn và có chữ "ĐẠO CỤ".</td><td>—</td><td>Quy định về tiền giả, giấy tờ có giá (BLHS 2015).</td></tr>
+
+<tr data-lv="y r"><td>18</td><td><b>Tài liệu tôn giáo, tín ngưỡng, ảnh thờ, bùa, vàng mã tâm linh</b></td><td><span class="badge y">🟡 Vàng</span><br><span class="badge r">🔴 Đỏ</span></td><td>🟡 ảnh thờ, vàng mã không có yếu tố chính trị. 🔴 kinh sách tôn giáo số lượng phát hành, tờ rơi truyền đạo/tổ chức chưa đăng ký.</td><td>Xác nhận của cơ sở/tổ chức tôn giáo hợp pháp (nếu phát hành).</td><td>Luật Tín ngưỡng, tôn giáo 2016. <span class="warn">⚠</span></td></tr>
+
+<tr data-lv="y"><td>19</td><td><b>Kêu gọi quyên góp, từ thiện, gây quỹ</b></td><td><span class="badge y">🟡 Vàng</span></td><td>Xin giấy phép/xác nhận của tổ chức hợp pháp (UBND, Mặt trận, quỹ được cấp phép). Không rõ chủ thể → 🔴.</td><td>Giấy phép/xác nhận của tổ chức.</td><td>Nguy cơ lừa đảo.</td></tr>
+
+<tr data-lv="k"><td>20</td><td><b>Nội dung chính trị – xã hội: kiến nghị tập thể, biểu ngữ phản đối, tuyên truyền tổ chức không được công nhận</b></td><td><span class="badge k">⛔ Đen</span></td><td>Từ chối + báo Quản lý ngay.</td><td>—</td><td>Điều 3.2.a, b.</td></tr>
+
+<tr data-lv="k r"><td>21</td><td><b>Tài liệu có chữ MẬT / TỐI MẬT / TUYỆT MẬT; tài liệu tố tụng, bản án</b></td><td><span class="badge k">⛔ Đen</span><br><span class="badge r">🔴 Đỏ</span></td><td>⛔ tài liệu có dấu mật (bí mật nhà nước). 🔴 hồ sơ tố tụng, bản án → chuyển Quản lý.</td><td>—</td><td>Luật Bảo vệ bí mật nhà nước 2018. Điều 3.2.c.</td></tr>
+
+<tr data-lv="k y"><td>22</td><td><b>Hồ sơ y tế: toa thuốc, bệnh án, kết quả xét nghiệm, giấy chứng sinh / tử</b></td><td><span class="badge k">⛔ Đen</span><br><span class="badge y">🟡 biểu mẫu trắng</span></td><td>⛔ giấy tờ y tế đã có nội dung/ký/dấu. 🟡 biểu mẫu trắng của phòng khám: xin giấy phép hoạt động của cơ sở.</td><td>Giấy phép hoạt động khám chữa bệnh (với biểu mẫu).</td><td>Dữ liệu sức khỏe là dữ liệu cá nhân nhạy cảm.</td></tr>
+
+<tr data-lv="y k"><td>23</td><td><b>Hàng nhạy cảm:</b> rượu bia; thuốc, TPCN, mỹ phẩm, hóa chất, thuốc BVTV; thuốc lá điện tử / nung nóng, vũ khí, pháo, ma túy, dụng cụ cờ bạc</td><td><span class="badge y">🟡 Vàng</span><br><span class="badge k">⛔ Đen</span></td><td>🟡 rượu bia, thuốc, TPCN, mỹ phẩm, hóa chất: xin giấy phép kinh doanh/đăng ký/công bố + xác nhận quảng cáo (nếu có quảng cáo). <b>⛔</b> thuốc lá điện tử/nung nóng (cấm từ 1/1/2025 theo NQ 173/2024/QH15), vũ khí, pháo, ma túy, dụng cụ cờ bạc.</td><td>GPKD ngành; số công bố/đăng ký lưu hành; xác nhận quảng cáo.</td><td>Điều 3.2.g, k.</td></tr>
+
+<tr data-lv="k"><td>24</td><td><b>Dịch vụ rủi ro cao:</b> cho vay / "tín dụng đen", đầu tư hứa lãi, tiền ảo, forex, đa cấp, "việc nhẹ lương cao", lô đề / cá độ, massage nhạy cảm</td><td><span class="badge k">⛔ Đen</span></td><td>Từ chối. Dấu hiệu lừa đảo / vi phạm pháp luật. Báo Quản lý.</td><td>—</td><td>Điều 3.2.k.</td></tr>
+
+<tr data-lv="g y"><td>25</td><td><b>Dữ liệu cá nhân hàng loạt:</b> danh sách nhân sự, bảng lương, danh sách khách hàng</td><td><span class="badge g">🟢 Xanh</span><br><span class="badge y">🟡 Vàng</span></td><td>🟢 nếu khách là chủ dữ liệu và in nội bộ. 🟡 nếu danh sách của bên thứ ba. Sale <b>không</b> giữ file ngoài hệ thống, không chuyển cho người khác, xóa theo quy định lưu trữ.</td><td>Cam kết đã được đồng ý của chủ thể dữ liệu (nếu của người khác).</td><td>Nghị định 13/2023; Luật Bảo vệ dữ liệu cá nhân 2025. Điều 2 điều khoản.</td></tr>
+
+</tbody>
+</table>
+</div>
+<p id="empty" class="small" hidden>Không có dòng nào khớp.</p>
+
+<h2 id="b4">4. Dấu hiệu cảnh báo (red flags) — thấy 1 dấu hiệu là chuyển Quản lý</h2>
+<div class="grid2">
+<div class="card"><ul>
+<li>Không muốn cung cấp tên/SĐT thật, né câu hỏi về mục đích.</li>
+<li>Không cho ghi tên xưởng / không nhận hóa đơn / chỉ trả tiền mặt số lớn.</li>
+<li>Yêu cầu in gấp ban đêm; yêu cầu xóa file ngay sau khi in.</li>
+<li>Gửi file qua kênh ẩn danh, đổi liên hệ liên tục.</li>
+</ul></div>
+<div class="card"><ul>
+<li>Nhiều giấy tờ giống nhau chỉ đổi tên/số.</li>
+<li>Hỏi "in được giống thật không", "in như thật được không".</li>
+<li>Kích thước, chất liệu giống giấy tờ, tem, tiền, thẻ thật.</li>
+<li>Người trả tiền không phải người đặt; số lượng lớn bất thường so với nhu cầu.</li>
+</ul></div>
+</div>
+
+<h2 id="b5">5. Câu hỏi nhanh sale hỏi khách (10 câu)</h2>
+<div class="card"><ol>
+<li>Anh/chị đặt in để làm gì ạ?</li>
+<li>Đơn này của cá nhân hay của công ty nào ạ?</li>
+<li>Nội dung/hình ảnh anh/chị tự thiết kế hay lấy từ nơi khác ạ?</li>
+<li>Có logo/hình/nhân vật của đơn vị khác không ạ?</li>
+<li>Có hình/thông tin của người khác không (đã xin phép họ chưa) ạ?</li>
+<li>Sản phẩm có bán ra thị trường hoặc phát hành rộng không ạ?</li>
+<li>Thuộc ngành hàng nào (thuốc, thực phẩm chức năng, mỹ phẩm, tài chính, bất động sản…) ạ?</li>
+<li>Anh/chị có giấy phép / giấy xác nhận nào đi kèm không ạ?</li>
+<li>Số lượng bao nhiêu và dùng ở đâu ạ?</li>
+<li>Anh/chị xác nhận mẫu và đồng ý Điều khoản in ấn của bên em được không ạ?</li>
+</ol></div>
+
+<h2 id="b6">6. Bảng giấy tờ cần xin</h2>
+<div class="tablewrap">
+<table>
+<thead><tr><th>Giấy tờ</th><th>Dùng khi</th><th>Cách kiểm tra nhanh</th><th>Cách lưu</th></tr></thead>
+<tbody>
+<tr><td>CCCD / hộ chiếu (cá nhân)</td><td>Đơn Vàng/Đỏ của cá nhân; khi Quản lý yêu cầu</td><td>Đối chiếu với người đến; không nhận bản chụp mờ, bản chụp từ người khác</td><td>Lưu bản sao gắn mã đơn; <b>hạn chế người xem</b>, không gửi Zalo nhóm</td></tr>
+<tr><td>Giấy đăng ký doanh nghiệp / MST</td><td>Đơn của công ty, tem nhãn, bao bì, quảng cáo ngành hạn chế</td><td>Tra cổng thông tin đăng ký doanh nghiệp quốc gia: tên, MST, tình trạng hoạt động, ngành nghề</td><td>Lưu ảnh/PDF; ghi MST vào đơn</td></tr>
+<tr><td>Giấy ủy quyền / hợp đồng sử dụng nhãn hiệu, hình ảnh</td><td>In logo/thương hiệu/nhân vật của bên khác; hàng OEM</td><td>Có tên 2 bên, phạm vi, thời hạn, chữ ký/dấu; đối chiếu logo trên mẫu</td><td>Lưu bản quét</td></tr>
+<tr><td>Giấy chứng nhận đăng ký nhãn hiệu</td><td>Bao bì, nhãn hàng hóa</td><td>Tra Cục Sở hữu trí tuệ / cơ sở dữ liệu nhãn hiệu</td><td>Lưu số văn bằng + ảnh</td></tr>
+<tr><td>Giấy phép xuất bản / quyết định xuất bản / hợp đồng xuất bản</td><td>Sách, kỷ yếu, tài liệu không kinh doanh, báo, tạp chí (nhóm 12)</td><td>Có số, ngày, cơ quan cấp (Sở TT&amp;TT / nhà xuất bản); nội dung khớp bản in; đơn vị in được phép</td><td>Lưu bản gốc đối chiếu + bản sao; chuyển Quản lý</td></tr>
+<tr><td>Giấy xác nhận nội dung quảng cáo / giấy công bố sản phẩm / số đăng ký lưu hành</td><td>Thuốc, TPCN, mỹ phẩm, khám chữa bệnh, rượu bia…</td><td>Có số, tên sản phẩm khớp, còn hiệu lực</td><td>Lưu ảnh/PDF</td></tr>
+<tr><td>Giấy giới thiệu / văn bản có dấu của đơn vị</td><td>Băng rôn, giấy khen, thẻ, vé, quyên góp</td><td>Có dấu, chữ ký, người đại diện; gọi xác minh nếu nghi ngờ</td><td>Lưu bản quét</td></tr>
+<tr><td>Xác nhận duyệt mẫu</td><td><b>Mọi đơn</b></td><td>Chữ ký trên phiếu, hoặc tin nhắn "ĐỒNG Ý" của chính khách đặt đơn (chụp màn hình)</td><td>Lưu cùng mã đơn, ghi rõ số mẫu/ngày giờ <span class="warn">⚠</span> xác nhận với luật sư mức giá trị của xác nhận Zalo</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="b7">7. Mẫu câu giao tiếp (giữ khách, không mất đơn)</h2>
+<div class="say"><b>Xin giấy tờ:</b> "Theo quy định ngành in, bên em phải lưu hồ sơ khi in loại này. Anh/chị gửi giúp em … để bên em lên đơn ngay ạ."</div>
+<div class="say"><b>Xin duyệt mẫu:</b> "Em gửi mẫu số …, anh/chị kiểm tra nội dung, chính tả, số liệu rồi nhắn 'ĐỒNG Ý' và đồng ý Điều khoản in ấn của P&amp;D để em tiến hành in ạ."</div>
+<div class="say"><b>Hỏi mục đích (nhẹ nhàng):</b> "Để bên em tư vấn đúng loại giấy và thủ tục, anh/chị cho em hỏi sản phẩm này dùng để … ạ?"</div>
+<div class="say"><b>Chuyển cấp:</b> "Sản phẩm này bên em cần quản lý xem hồ sơ trước. Em báo lại anh/chị trong hôm nay ạ."</div>
+<div class="say"><b>Từ chối:</b> "Rất tiếc nội dung này nằm ngoài phạm vi bên em được phép in theo quy định nên em xin phép không nhận. Nếu đã thanh toán, em hoàn lại sau khi trừ chi phí đã phát sinh (nếu có) ạ."</div>
+<p class="small">Không nói: "bên em không cần biết khách in gì", "in sao cũng được, khách chịu trách nhiệm" — câu này có thể bị coi là xưởng cố ý bỏ qua.</p>
+
+<h2 id="b8">8. Mẫu "Phiếu xác nhận nội dung & cam kết của khách hàng" (cho đơn Vàng)</h2>
+<div class="tablewrap">
+<table class="form">
+<tbody>
+<tr><th style="width:26%">Họ tên / đơn vị</th><td></td><th style="width:16%">CCCD / MST</th><td></td></tr>
+<tr><th>Số điện thoại</th><td></td><th>Mã đơn</th><td></td></tr>
+<tr><th>Mô tả sản phẩm in</th><td colspan="3"></td></tr>
+<tr><th>Mục đích sử dụng</th><td colspan="3"></td></tr>
+<tr><th>Giấy tờ kèm theo</th><td colspan="3">☐ GPKD/MST &nbsp; ☐ Ủy quyền nhãn hiệu &nbsp; ☐ Giấy phép xuất bản &nbsp; ☐ Xác nhận quảng cáo/công bố sản phẩm &nbsp; ☐ Giấy giới thiệu &nbsp; ☐ Khác: ……………</td></tr>
+<tr><th>Khách hàng cam kết</th><td colspan="3">☐ Có quyền hợp pháp đối với toàn bộ nội dung đặt in.<br>☐ Nội dung không vi phạm Điều 3 của Điều khoản dịch vụ in ấn.<br>☐ Đã được sự đồng ý của người có hình ảnh/thông tin trong sản phẩm (nếu có).<br>☐ Chịu trách nhiệm và bồi thường cho P&amp;D theo Điều 7.<br>☐ Đã duyệt mẫu số ………… và đồng ý Điều khoản in ấn.</td></tr>
+<tr><th>Chữ ký khách hàng</th><td></td><th>Sale tiếp nhận</th><td></td></tr>
+<tr><th>Ngày</th><td></td><th>Quản lý duyệt (đơn Đỏ)</th><td></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="b9">9. Nhật ký đơn từ chối / chuyển cấp</h2>
+<div class="tablewrap">
+<table class="form">
+<thead><tr><th>Ngày</th><th>Mã đơn / khách</th><th>Nhóm (mục 3)</th><th>Lý do</th><th>Người quyết định</th><th>Kết quả (nhận / từ chối / hoàn cọc)</th></tr></thead>
+<tbody><tr><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td><td></td><td></td></tr></tbody>
+</table>
+</div>
+
+<h2 id="b10">10. Lưu ý pháp lý & việc xưởng cần tự kiểm tra</h2>
+<div class="card">
+<h3>Điều khoản chỉ là một lớp bảo vệ</h3>
+<p>Điều khoản in ấn giúp giảm rủi ro <b>dân sự</b> và là bằng chứng xưởng đã hỏi, đã nhận cam kết. Nó <b>không</b> loại trừ trách nhiệm hành chính của cơ sở in (nếu in sai quy định) hay trách nhiệm hình sự khi thực tế <b>biết rõ</b> hành vi vi phạm (làm giả giấy tờ, tiền, tem…). Lớp bảo vệ chính là <b>quy trình ở bảng này</b>: hỏi – xem – phân loại – lưu – từ chối khi cần.</p>
+<h3>Căn cứ tham khảo <span class="warn">⚠ luật sư xác nhận số điều</span></h3>
+<ul>
+<li>Luật Xuất bản 2012 (Điều 10 – hành vi bị nghiêm cấm); luật sửa đổi Luật Xuất bản có hiệu lực 1/3/2027.</li>
+<li>Nghị định 60/2014/NĐ-CP về hoạt động in, sửa đổi bởi Nghị định 25/2018/NĐ-CP và 72/2022/NĐ-CP (điều kiện nhận in: hợp đồng/phiếu đặt in, mẫu có xác nhận của bên đặt in, giấy tờ liên quan, giấy tờ nhân thân).</li>
+<li>Luật Sở hữu trí tuệ; Luật Quảng cáo; Nghị định 43/2017/NĐ-CP (nhãn hàng hóa).</li>
+<li>Bộ luật Dân sự 2015 (Điều 32 – quyền đối với hình ảnh); Bộ luật Hình sự 2015 (làm giả con dấu/tài liệu, tiền giả, hàng giả, xâm phạm quyền tác giả/sở hữu công nghiệp).</li>
+<li>Nghị định 13/2023/NĐ-CP và Luật Bảo vệ dữ liệu cá nhân 2025 (có hiệu lực 1/1/2026); Luật Bảo vệ quyền lợi người tiêu dùng 2023.</li>
+</ul>
+<h3>Việc Quản lý / chủ xưởng cần làm</h3>
+<ol>
+<li>Kiểm tra xưởng đã khai báo / đăng ký hoạt động in, máy in kỹ thuật số, máy photocopy màu với Sở Thông tin và Truyền thông chưa.</li>
+<li>Xác định xưởng có giấy phép in xuất bản phẩm, in tem chống giả, giấy tờ có bảo mật hay không. <b>Nếu không có → mặc định từ chối nhóm 12 và phần tem chống giả ở nhóm 4.</b></li>
+<li>Chốt thời hạn lưu hồ sơ (điều khoản đang ghi tối thiểu 24 tháng) và nơi lưu (hạn chế quyền xem dữ liệu cá nhân).</li>
+<li>Chỉ định người quyết định đơn Đỏ và người nhận báo cáo nhật ký từ chối.</li>
+<li>Gửi luật sư / Sở TT&amp;TT rà các mục đánh dấu ⚠ trước khi áp dụng chính thức; rà lại khi có văn bản mới.</li>
+</ol>
+</div>
+
+<p class="small noprint">Nội dung phiếu Điều khoản dịch vụ in ấn là bản duy nhất ở <code>utils/printTerms.ts</code> trong mã nguồn. File này là tài liệu nội bộ, không đưa vào phần mềm.</p>
+</div>
+
+<script>
+(function () {
+  var q = document.getElementById('q');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#main tbody tr'));
+  var btns = Array.prototype.slice.call(document.querySelectorAll('.tools button'));
+  var empty = document.getElementById('empty');
+  var level = 'all';
+  function norm(s) { return (s || '').toLowerCase(); }
+  function apply() {
+    var term = norm(q && q.value);
+    var shown = 0;
+    rows.forEach(function (r) {
+      var okLv = level === 'all' || (' ' + r.getAttribute('data-lv') + ' ').indexOf(' ' + level + ' ') > -1;
+      var okTx = !term || norm(r.textContent).indexOf(term) > -1;
+      r.hidden = !(okLv && okTx);
+      if (!r.hidden) shown++;
+    });
+    if (empty) empty.hidden = shown > 0;
+  }
+  if (q) q.addEventListener('input', apply);
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      level = b.getAttribute('data-lv');
+      btns.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      apply();
+    });
+  });
+})();
+</script>
+</body>
+</html>

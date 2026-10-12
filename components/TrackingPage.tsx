@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { trackingService, PublicOrderInfo } from '../services/trackingService';
 import { STATUS_LABEL_MAP, COLORS } from '../constants';
+import { PRINT_TERMS_INTRO, PRINT_TERMS_ARTICLES } from '../utils/printTerms';
 
 interface TrackingPageProps {
     token: string;
@@ -233,25 +234,18 @@ const TrackingPage: React.FC<TrackingPageProps> = ({ token }) => {
                         <i className="fa-solid fa-file-contract text-gray-600"></i> Điều khoản in ấn
                     </h3>
                     <div className="text-xs text-gray-600 space-y-2 leading-relaxed text-justify bg-gray-50 p-3 rounded border border-gray-100">
-                        <p>Quý khách hàng khi đặt hàng in các sản phẩm in ấn tại Công Ty TNHH In P&D (sau đây gọi tắt là P&D), đồng nghĩa với việc khách hàng đã được thông báo, đọc hiểu và đồng ý với các điều khoản sau:</p>
-
-                        <p><strong>1. Thông tin khách hàng:</strong><br />
-                            - Khách hàng cam kết các thông tin về nhân thân chính chủ (Họ và tên, số điện thoại, email,...) mà khách hàng sử dụng để liên hệ và làm việc với P&D là hợp pháp. Không có bất kỳ việc sử dụng thông tin cá nhân không chính chủ và bất hợp pháp nào để tạo đơn hàng, nếu có Khách hàng chịu mọi trách nhiệm trước Pháp luật.<br />
-                            - Công Ty TNHH In P&D không có trách nhiệm phải xác minh, biết hoặc phải biết thông tin của Khách hàng liên hệ với P&D là hợp pháp hay không. Trong trường hợp P&D nhận thấy có bất kỳ bằng chứng nào cho thấy Khách hàng sử dụng thông tin cá nhân trái phép hoặc khi có yêu cầu của cơ quan có thẩm quyền, P&D sẽ bảo lưu quyền của mình: miễn trách nhiệm bồi thường cho Khách hàng và bên thứ ba khác (nếu có); Khách hàng hoàn toàn chịu mọi trách nhiệm trước Pháp luật.<br />
-                            - Các thông tin về sản phẩm hoặc các thông tin, trao đổi khác có liên quan đến sản phẩm, P&D sẽ liên hệ Khách hàng qua số điện thoại, tài khoản zalo, email, ... mà khách hàng đã cung cấp.</p>
-
-                        <p><strong>2. Nội dung sản phẩm in:</strong><br />
-                            - Khách hàng cam kết Nội dung sản phẩm in không chứa các nội dung sau:<br />
-                            a) Tuyên truyền chống Nhà nước Cộng hòa xã hội chủ nghĩa Việt Nam; phá hoại khối đại đoàn kết toàn dân tộc.<br />
-                            b) Tuyên truyền kích động chiến tranh xâm lược, chủ nghĩa khủng bố, chủ nghĩa li khai, gây hận thù, chia rẽ giữa các dân tộc và nhân dân các nước; kích động bạo lực; truyền bá tư tưởng phản động, lối sống dâm ô, đồi trụy, hành vi tội ác, tệ nạn xã hội, mê tín dị đoan, phá hoại thuần phong mỹ tục.<br />
-                            c) Tiết lộ bí mật nhà nước, bí mật đời tư của cá nhân và bí mật khác do pháp luật quy định.<br />
-                            d) Thông tin sai sự thật, xuyên tạc lịch sử, phủ nhận thành tựu cách mạng; xúc phạm dân tộc, danh nhân, anh hùng dân tộc; sử dụng hình ảnh bản đồ Việt Nam nhưng không thể hiện hoặc thể hiện không đúng chủ quyền quốc gia; vu khống, xúc phạm uy tín của cơ quan, tổ chức và danh dự, nhân phẩm của cá nhân.</p>
-
-                        <p><strong>3. Quyền và trách nhiệm đối với sản phẩm in:</strong><br />
-                            - Khách hàng là người có đầy đủ quyền đặt in, gia công sau in, chế bản đối với các sản phẩm mà khách hàng đặt in tại P&D, và chịu toàn bộ trách nhiệm trước pháp luật cho bất kỳ nghĩa vụ nào đối với cá nhân, tổ chức khác (nếu có).<br />
-                            - Sản phẩm in không xâm phạm đến quyền sở hữu trí tuệ hoặc quyền và lợi ích hợp pháp của cá nhân, tổ chức khác (nếu có).<br />
-                            - Sản phẩm in không dùng cho mục đích làm giả giấy tờ của cơ quan nhà nước, trực tiếp hoặc gián tiếp sản xuất hàng giả hoặc phát tán nội dung vi phạm quy định pháp luật.<br />
-                            - P&D không có trách nhiệm tìm hiểu, xác minh, biết hoặc phải biết mục đích sử dụng dịch vụ của Khách hàng hoặc các nội dung của sản phẩm mà Khách hàng đặt in có vi phạm quyền sở hữu trí tuệ hay các quy định khác của pháp luật có liên quan.</p>
+                        <p>{PRINT_TERMS_INTRO}</p>
+                        {PRINT_TERMS_ARTICLES.map(article => (
+                            <div key={article.title}>
+                                <p><strong>{article.title}</strong></p>
+                                {article.clauses.map(clause => (
+                                    <div key={clause.text} className="mt-0.5">
+                                        <p>{clause.text}</p>
+                                        {clause.items?.map(item => <p key={item} className="pl-4">{item}</p>)}
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
                     </div>
                 </div>
 
