@@ -64,6 +64,8 @@ const PerformanceStatsModal: React.FC<Props> = ({ isOpen, onClose, currentUserRo
             const data = await commissionService.getPerformanceStats(start, end, scope.filterName);
             setStats(data as PerformanceStat[]);
         } catch (err: any) {
+            // Xoá số cũ: tránh nhầm số của khoảng ngày trước là của khoảng vừa chọn
+            setStats([]);
             setError(err.message || 'Lỗi khi tải thống kê.');
         } finally {
             setLoading(false);
