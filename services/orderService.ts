@@ -90,6 +90,20 @@ export function buildReworkDraft(source: Order, root: { id: string }): Partial<O
     };
 }
 
+/** Một dòng kết quả tra mã chuyển khoản (chỉ các cột cần hiển thị). */
+export interface TransferLookupRow {
+    id: string;
+    order_code: string;
+    payment_random_code?: string | null;
+    status: string;
+    payment_status: string;
+    total_amount: number;
+    deposit_amount: number;
+    created_at: string;
+    customer?: { code?: string; name?: string } | null;
+    sales_rep?: { full_name?: string } | null;
+}
+
 export const orderService = {
 
     // ... (getById, getOrders remain same)
@@ -111,6 +125,29 @@ export const orderService = {
         if (error) throw error;
         await attachReworkLinks([data as Order]);
         return data as Order;
+    },
+
+    // Tra đơn theo nội dung chuyển khoản. Nhận cả đoạn sao kê dán nguyên: tách token rồi
+    // khớp với payment_random_code (đơn TK thường) hoặc order_code (đơn VAT: "TT DH <mã đơn>").
+    // Cố ý KHÔNG lọc tháng/trạng thái — kế toán cần thấy cả đơn cũ, đơn đã hủy.
+    async findByTransferContent(text: string): Promise<TransferLookupRow[]> {
+        const tokens = Array.from(new Set(
+            text.toUpperCase().split(/[^A-Z0-9]+/).filter(t => t.length >= 4)
+        )).slice(0, 20);
+        if (tokens.length === 0) return [];
+
+        // Token chỉ gồm [A-Z0-9] nên ghép thẳng vào chuỗi .or() là an toàn
+        const list = tokens.join(',');
+        const { data, error } = await supabase
+            .from('orders')
+            .select('id, order_code, payment_random_code, status, payment_status, total_amount, deposit_amount, created_at, customer:customer_id(code, name), sales_rep:sales_rep_id(full_name)')
+            .is('rework_of_order_id', null)
+            .or(`payment_random_code.in.(${list}),order_code.in.(${list})`)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+        return (data || []) as unknown as TransferLookupRow[];
     },
 
     // GET orders by Customer

@@ -32,6 +32,7 @@ import ActivityLogModal from './components/reports/ActivityLogModal';
 import CustomerReportModal from './components/reports/CustomerReportModal';
 import CustomerRevenueModal from './components/reports/CustomerRevenueModal';
 import ReworkReportModal from './components/reports/ReworkReportModal';
+import TransferCodeLookupModal from './components/reports/TransferCodeLookupModal';
 import TrackingPage from './components/TrackingPage';
 
 import { AISettingsModal } from './components/AISettingsModal';
@@ -74,6 +75,7 @@ const App: React.FC = () => {
   // nextCode chỉ để hiện trước trong form; mã thật do trigger CSDL sinh khi lưu.
   const [reworkOf, setReworkOf] = useState<{ id: string; order_code: string; nextCode: string } | null>(null);
   const [isReworkReportOpen, setIsReworkReportOpen] = useState(false);
+  const [isTransferLookupOpen, setIsTransferLookupOpen] = useState(false);
   const [isCustomerManagerOpen, setIsCustomerManagerOpen] = useState(false);
   const [isFinancialReportOpen, setIsFinancialReportOpen] = useState(false);
   const [isSalesCommOpen, setIsSalesCommOpen] = useState(false);
@@ -338,6 +340,7 @@ const App: React.FC = () => {
     { label: "BC Hoạt động", icon: "fa-chart-pie", color: COLORS.btnActivityReport, onClick: () => setIsActivityReportOpen(true), roles: ['Admin', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile', 'KeToan'] },
     { label: "Lịch sử HĐ", icon: "fa-history", color: "#607d8b", onClick: () => setIsActivityLogOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat'] },
     { label: "BC SX lại", icon: "fa-rotate", color: "#e65100", onClick: () => setIsReworkReportOpen(true), roles: ['Admin', 'KeToan', 'QuanLySanXuat'] },
+    { label: "Tra mã CK", icon: "fa-magnifying-glass-dollar", color: "#0f766e", onClick: () => setIsTransferLookupOpen(true), roles: ['Admin', 'KeToan', 'NhanVienKinhDoanh'] },
     { label: "Báo cáo TC", icon: "fa-cash-register", color: COLORS.btnFinanceReport, onClick: () => setIsFinancialReportOpen(true), roles: ['Admin', 'KeToan'] },
     { label: "Thống kê HS", icon: "fa-person-digging", color: COLORS.btnWorkStats, onClick: () => setIsPerformanceStatsOpen(true), roles: ['Admin', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienThietKe', 'NhanVienBinhFile'] }, // Allowed for production staff to see own stats
     { label: "Đánh giá NVKD", icon: "fa-chart-line", color: COLORS.btnEvalSales, onClick: () => setIsSalesEvalOpen(true), roles: ['Admin', 'NhanVienKinhDoanh', 'KeToan'] },
@@ -566,6 +569,18 @@ const App: React.FC = () => {
   const handleOpenOrder = (ref: { id: string; order_code: string }) => {
     if (currentTab === '📊 Tổng quan') setCurrentTab('Tất cả');
     setSearchTerm(ref.order_code);
+  };
+
+  // Mở đơn từ kết quả tra mã CK. Bộ lọc tháng chặn đơn tháng khác và ô tìm kiếm không
+  // bỏ qua nó, nên phải nhảy sang đúng tháng tạo đơn + bỏ lọc ngày, rồi mới tìm theo mã.
+  const handleOpenOrderFromLookup = (order: { order_code: string; created_at: string }) => {
+    const created = new Date(order.created_at);
+    setOrderMonth(created.getMonth() + 1);
+    setOrderYear(created.getFullYear());
+    setFromDate('');
+    setToDate('');
+    if (currentTab === '📊 Tổng quan') setCurrentTab('Tất cả');
+    setSearchTerm(order.order_code);
   };
 
   return (
@@ -1043,6 +1058,12 @@ const App: React.FC = () => {
         isOpen={isReworkReportOpen}
         onClose={() => setIsReworkReportOpen(false)}
         onOpenOrder={(ref) => { setIsReworkReportOpen(false); handleOpenOrder(ref); }}
+      />
+
+      <TransferCodeLookupModal
+        isOpen={isTransferLookupOpen}
+        onClose={() => setIsTransferLookupOpen(false)}
+        onOpenOrder={(order) => { setIsTransferLookupOpen(false); handleOpenOrderFromLookup(order); }}
       />
 
       <AISettingsModal
