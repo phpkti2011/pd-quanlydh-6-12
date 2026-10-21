@@ -5,6 +5,7 @@ import { Order, OrderStatus } from '../types';
 import StatusTabs from './StatusTabs';
 import TaskControl from './TaskControl';
 import StageControl from './StageControl';
+import SampleApprovalControl, { canToggleSampleApproval, isAwaitingApproval } from './SampleApprovalControl';
 
 const COLORS = {
   stageBinhFile: '#795548',
@@ -68,6 +69,16 @@ const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, curren
   // Use orders directly from props (App.tsx handles all filtering now)
   const filteredOrders = orders;
 
+  // Chờ khách duyệt mẫu (công đoạn In) — đơn sản xuất lại không có công đoạn nên bỏ qua
+  const sampleApproval = (order: Order) => order.rework_of_order_id ? null : (
+    <SampleApprovalControl
+      order={order}
+      canToggle={canToggleSampleApproval(currentUser?.role)}
+      onChanged={onRefresh}
+      compact
+    />
+  );
+
   const renderStageCell = (order: Order) => {
     switch (order.status) {
       case 'BinhFile':
@@ -83,17 +94,20 @@ const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, curren
           isJoined={checkIsJoined(order, 'BinhFile')}
         />;
       case 'In':
-        return <StageControl
-          stageKey="In"
-          stageLabel="In"
-          orderId={order.id}
-          participants={order.participants?.filter(p => p.stage === 'In') || []}
-          color={COLORS.stageIn}
-          isProminent={true}
-          onJoin={async () => { await orderService.joinStage(order.id, 'In', currentUser?.id); onRefresh(); }}
-          onLeave={async () => { await orderService.leaveStage(order.id, 'In', currentUser?.id); onRefresh(); }}
-          isJoined={checkIsJoined(order, 'In')}
-        />;
+        return <>
+          <StageControl
+            stageKey="In"
+            stageLabel="In"
+            orderId={order.id}
+            participants={order.participants?.filter(p => p.stage === 'In') || []}
+            color={COLORS.stageIn}
+            isProminent={true}
+            onJoin={async () => { await orderService.joinStage(order.id, 'In', currentUser?.id); onRefresh(); }}
+            onLeave={async () => { await orderService.leaveStage(order.id, 'In', currentUser?.id); onRefresh(); }}
+            isJoined={checkIsJoined(order, 'In')}
+          />
+          {sampleApproval(order)}
+        </>;
       case 'ThanhPham':
         return <StageControl
           stageKey="ThanhPham"
@@ -108,6 +122,7 @@ const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, curren
         />;
       default:
         return (
+          <>
           <div className="flex gap-2 text-xs">
             {(order.participants?.filter(p => p.stage === 'BinhFile').length || 0) > 0 && (
               <div className="px-2 py-1 bg-gray-100 rounded border border-gray-200">
@@ -125,6 +140,8 @@ const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, curren
               </div>
             )}
           </div>
+          {sampleApproval(order)}
+          </>
         );
     }
   };
@@ -161,6 +178,7 @@ const OrderList: React.FC<OrderListProps> = ({ orders, onEdit, onRefresh, curren
                   <div className="text-[#00796b] font-medium text-xs">{order.customer?.name || 'Vãng lai'}</div>
                   <div className="text-xs text-gray-500 mt-1">{formatDateTime(order.created_at)}</div>
                   {order.is_urgent && <span className="inline-block mt-1 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">GẤP</span>}
+                  {!isRework && isAwaitingApproval(order) && <span className="inline-block mt-1 ml-1 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold animate-pulse">CHỜ DUYỆT MẪU</span>}
                   {isRework && (
                     <button
                       type="button"

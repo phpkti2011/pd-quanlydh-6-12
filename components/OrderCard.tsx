@@ -4,6 +4,7 @@ import { formatDate, formatDateTime } from '../utils/dateFormatter';
 import { Order } from '../types';
 import { COLORS, STATUS_LABEL_MAP, WORKFLOW_STATUS_KEYS } from '../constants';
 import StageControl from './StageControl';
+import SampleApprovalControl, { canToggleSampleApproval, isAwaitingApproval } from './SampleApprovalControl';
 import TaskControl from './TaskControl';
 import { orderService } from '../services/orderService';
 import { generatePrintHTML } from '../utils/printGenerator';
@@ -49,6 +50,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
     // Đơn sản xuất lại (xem setup_rework_orders.sql): không công đoạn, không
     // thanh toán, không hoa hồng — thẻ rút gọn, chỉ còn Hoàn thành / Hủy.
     const isRework = !!order.rework_of_order_id;
+    // Cờ "chờ khách duyệt mẫu": chỉ cảnh báo, không chặn đổi trạng thái. GẤP (đỏ) được ưu tiên về màu viền.
+    const awaitingApproval = !isRework && isAwaitingApproval(order);
     const canRework = ['Admin', 'QuanLySanXuat', 'NhanVienKinhDoanh'].includes(currentUser?.role);
 
     const [editingField, setEditingField] = React.useState<{ field: keyof Order | 'payment_note', title: string, value: string } | null>(null);
@@ -311,8 +314,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                 ${isPaused ? 'bg-gray-50' : ''}
                 ${isUrgent && !isCancelled && !isCompleted ? 'bg-red-50 border-red-500 ring-1 ring-red-200 shadow-red-100' : ''} 
                 ${isCancelled ? 'bg-gray-100 border-gray-400 opacity-75' : ''}
+                ${awaitingApproval && !(isUrgent && !isCompleted) ? 'ring-1 ring-amber-300' : ''}
 `}
-            style={{ borderLeftColor: isPaused ? '#9ca3af' : (isCancelled ? '#9ca3af' : (isUrgent ? '#ef4444' : borderColor)) }}
+            style={{ borderLeftColor: isPaused ? '#9ca3af' : (isCancelled ? '#9ca3af' : (isUrgent ? '#ef4444' : (awaitingApproval ? '#f59e0b' : borderColor))) }}
         >
             <div className={`flex-1 flex flex-col ${isPaused ? 'opacity-50 pointer-events-none grayscale' : ''} ${isCancelled ? 'grayscale' : ''} `}>
                 {/* Header */}
@@ -325,6 +329,11 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                             {isUrgent && !isCancelled && !isCompleted && (
                                 <span className="animate-pulse px-2 py-0.5 rounded text-[10px] font-black bg-red-600 text-white uppercase tracking-wider shadow-sm shrink-0">
                                     GẤP
+                                </span>
+                            )}
+                            {awaitingApproval && (
+                                <span className="animate-pulse px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider shadow-sm shrink-0">
+                                    CHỜ DUYỆT MẪU
                                 </span>
                             )}
                             <span className="text-sm font-bold text-[#00796b] block break-words">{order.customer?.name || 'Vãng lai'}</span>
@@ -451,6 +460,17 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
 
                 {/* Dynamic Stage Button — đơn sản xuất lại không có công đoạn */}
                 {!isRework && renderStageControl()}
+
+                {/* Chờ khách duyệt mẫu (công đoạn In): nút bật khi đơn đang ở In; banner + "Đã duyệt" khi đang chờ */}
+                {!isRework && !isLocked && (
+                    <div className="px-3 empty:hidden">
+                        <SampleApprovalControl
+                            order={order}
+                            canToggle={canToggleSampleApproval(currentUser?.role)}
+                            onChanged={onRefresh}
+                        />
+                    </div>
+                )}
 
                 {/* Body Details - Grid Layout matches Screenshot */}
                 <div className="p-4 space-y-3 flex-1 text-[14px]">

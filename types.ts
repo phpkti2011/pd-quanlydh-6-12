@@ -127,6 +127,10 @@ export interface Order {
   ep_kim_status?: 'Pending' | 'Completed';
   invoice_status?: 'Pending' | 'Issued';
 
+  // Chờ khách duyệt mẫu ở công đoạn In (xem alter_orders_add_awaiting_approval.sql)
+  awaiting_customer_approval?: boolean;
+  awaiting_approval_at?: string | null;
+
   total_amount_pre_vat: number;
   vat_rate: number;
   vat_amount: number;
