@@ -325,14 +325,16 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                         <div className="flex items-center gap-2 max-w-full">
                             <h4 className="font-bold text-[#333] text-base md:text-xl leading-tight break-all">{order.order_code}</h4>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
+                        {/* flex-wrap: chip GẤP / CHỜ DUYỆT MẪU không chiếm chỗ của tên khách — hết chỗ thì tên
+                            xuống dòng nguyên khối thay vì bị ép thành từng chữ một. */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                             {isUrgent && !isCancelled && !isCompleted && (
-                                <span className="animate-pulse px-2 py-0.5 rounded text-[10px] font-black bg-red-600 text-white uppercase tracking-wider shadow-sm shrink-0">
+                                <span className="animate-pulse px-2 py-0.5 rounded text-[10px] font-black bg-red-600 text-white uppercase tracking-wider shadow-sm shrink-0 whitespace-nowrap">
                                     GẤP
                                 </span>
                             )}
                             {awaitingApproval && (
-                                <span className="animate-pulse px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider shadow-sm shrink-0">
+                                <span className="animate-pulse px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider shadow-sm shrink-0 whitespace-nowrap">
                                     CHỜ DUYỆT MẪU
                                 </span>
                             )}
