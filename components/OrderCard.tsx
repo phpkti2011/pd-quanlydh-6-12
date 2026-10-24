@@ -120,7 +120,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
         if (editingField.field === 'status_note') setStatusComments(prev => [...prev, optimisticComment]);
         if (editingField.field === 'notes') setNoteComments(prev => [...prev, optimisticComment]);
 
-        await orderService.updateOrder(order.id, plainUpdates);
+        // Ghi chú đơn hàng: mục hội thoại đã được CommentSection lưu vào order_comments.
+        // KHÔNG ghi đè orders.notes — cột đó giữ ghi chú NVKD nhập khi lên đơn (chỉ đổi ở
+        // form sửa đơn). Ghi đè sẽ làm mất ghi chú của NVKD khi Bình file/Thiết kế ghi chú thêm.
+        if (editingField.field !== 'notes') {
+            await orderService.updateOrder(order.id, plainUpdates);
+        }
         onRefresh();
         if (!keepOpen) {
             setEditingField(null);
@@ -635,17 +640,33 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onEdit, onRefresh, current
                             {/* Display Order Note with Metadata */}
                             <div className="flex flex-col w-full gap-2 border-l-2 border-gray-100 pl-2">
                                 {noteComments.length > 0 ? (
-                                    noteComments.map((comment, idx) => (
-                                        <div key={comment.id || idx} className="border-b last:border-0 border-dashed border-gray-200 pb-1 last:pb-0">
-                                            <div className="text-red-600 font-bold whitespace-pre-wrap break-words text-[13px]">
-                                                {comment.content}
+                                    <>
+                                        {/* Ghi chú NVKD nhập khi lên đơn nằm ở orders.notes, không có trong luồng
+                                            hội thoại → luôn hiện đầu tiên, trừ khi trùng một mục trong luồng
+                                            (đơn cũ mà cột đã bị ghi đè bằng đúng ghi chú mới nhất). */}
+                                        {order.notes?.trim() && !noteComments.some(c => c.content?.trim() === order.notes!.trim()) && (
+                                            <div className="border-b border-dashed border-gray-200 pb-1">
+                                                <div className="text-red-600 font-bold whitespace-pre-wrap break-words text-[13px]">
+                                                    {order.notes}
+                                                </div>
+                                                <div className="text-[10px] text-gray-400 mt-0.5 italic flex gap-2">
+                                                    <span className="font-semibold">{order.sales_rep?.full_name || 'NVKD'}</span>
+                                                    <span>Khi lên đơn · {formatDateTime(order.created_at)}</span>
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] text-gray-400 mt-0.5 italic flex gap-2">
-                                                <span className="font-semibold">{comment.user?.full_name || 'N/A'}</span>
-                                                <span>{formatDateTime(comment.created_at)}</span>
+                                        )}
+                                        {noteComments.map((comment, idx) => (
+                                            <div key={comment.id || idx} className="border-b last:border-0 border-dashed border-gray-200 pb-1 last:pb-0">
+                                                <div className="text-red-600 font-bold whitespace-pre-wrap break-words text-[13px]">
+                                                    {comment.content}
+                                                </div>
+                                                <div className="text-[10px] text-gray-400 mt-0.5 italic flex gap-2">
+                                                    <span className="font-semibold">{comment.user?.full_name || 'N/A'}</span>
+                                                    <span>{formatDateTime(comment.created_at)}</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        ))}
+                                    </>
                                 ) : (
                                     <div className="text-red-600 font-bold whitespace-pre-wrap break-words">
                                         {order.notes || "Không có"}

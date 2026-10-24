@@ -80,7 +80,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         <div className="flex flex-col gap-2">
             {/* History List */}
             <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                {comments.length === 0 && initialContent && (
+                {initialContent?.trim() && !comments.some(c => c.content?.trim() === initialContent.trim()) && (
                     <div className="text-sm p-2 bg-gray-50 border border-gray-100 rounded text-gray-500 italic">
                         (Nội dung cũ): {initialContent}
                     </div>
