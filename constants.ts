@@ -65,6 +65,10 @@ export const TASK_TABS = ["Thiết Kế", "In Khổ Lớn", "Bế Demi", "Gia c�
 // StatusTabs, App.tsx và orderService để không gõ lệch nhãn.
 export const REWORK_TAB = "🔁 Sản xuất lại";
 
+// Hai tab duyệt mẫu ở công đoạn In (xem utils/sampleApproval.ts)
+export const SAMPLE_WAITING_TAB = "Chờ duyệt mẫu";
+export const SAMPLE_APPROVED_TAB = "Đã duyệt mẫu";
+
 export const COLORS = {
   primary: "#00796b",
   primaryDark: "#005a4f",

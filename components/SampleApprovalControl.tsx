@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Order } from '../types';
 import { orderService } from '../services/orderService';
 import { formatDateTime } from '../utils/dateFormatter';
+import { isAwaitingApproval, isSampleApprovedAtPrint } from '../utils/sampleApproval';
 
 /**
  * Cờ "Đang chờ khách duyệt mẫu" ở công đoạn In (xem alter_orders_add_awaiting_approval.sql).
@@ -14,9 +15,8 @@ import { formatDateTime } from '../utils/dateFormatter';
 export const canToggleSampleApproval = (role?: string) =>
     ['Admin', 'admin', 'QuanLySanXuat', 'NhanVienSanXuat', 'NhanVienKinhDoanh', 'KeToan'].includes(role || '');
 
-/** Đơn đang chờ khách duyệt mẫu (và chưa kết thúc) — dùng cho chip/viền ở thẻ và bảng */
-export const isAwaitingApproval = (order: Order) =>
-    !!order.awaiting_customer_approval && order.status !== 'Huy' && order.status !== 'HoanThanh';
+// Công thức dùng chung ở utils/sampleApproval.ts (cũng dùng cho số đếm và bộ lọc tab)
+export { isAwaitingApproval };
 
 interface Props {
     order: Order;
@@ -29,8 +29,9 @@ const SampleApprovalControl: React.FC<Props> = ({ order, canToggle, onChanged, c
     const [saving, setSaving] = useState(false);
 
     const awaiting = isAwaitingApproval(order);
+    const approvedAtPrint = isSampleApprovedAtPrint(order);
     const canStart = !order.awaiting_customer_approval && order.status === 'In' && canToggle;
-    if (!awaiting && !canStart) return null;
+    if (!awaiting && !canStart && !approvedAtPrint) return null;
 
     const save = async (updates: Partial<Order>) => {
         setSaving(true);
@@ -44,26 +45,39 @@ const SampleApprovalControl: React.FC<Props> = ({ order, canToggle, onChanged, c
         }
     };
 
+    // Chờ (lại) → xoá dấu "đã duyệt" cũ; Duyệt → ghi lúc duyệt để vào tab "Đã duyệt mẫu"
     const startWaiting = () => save({
         awaiting_customer_approval: true,
         awaiting_approval_at: new Date().toISOString(),
+        sample_approved_at: null,
     });
     const approve = () => save({
         awaiting_customer_approval: false,
         awaiting_approval_at: null,
+        sample_approved_at: new Date().toISOString(),
     });
 
     if (!awaiting) {
         return (
-            <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); startWaiting(); }}
-                disabled={saving}
-                className={`w-full ${compact ? 'mt-1 py-1 text-xs' : 'mt-2 py-2 text-sm'} rounded border border-amber-300 bg-amber-50 text-amber-800 font-bold hover:bg-amber-100 transition-colors disabled:opacity-50`}
-            >
-                <i className={`fa-solid ${saving ? 'fa-spinner fa-spin' : 'fa-hourglass-half'} mr-1.5`}></i>
-                Chờ khách duyệt mẫu
-            </button>
+            <>
+                {approvedAtPrint && (
+                    <div className={`${compact ? 'mt-1 text-[11px]' : 'mt-2 text-xs'} rounded border border-green-200 bg-green-50 px-2 py-1 text-green-800 font-semibold`}>
+                        <i className="fa-solid fa-circle-check mr-1"></i>
+                        Khách đã duyệt mẫu · {formatDateTime(order.sample_approved_at)}
+                    </div>
+                )}
+                {canStart && (
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); startWaiting(); }}
+                        disabled={saving}
+                        className={`w-full ${compact ? 'mt-1 py-1 text-xs' : 'mt-2 py-2 text-sm'} rounded border border-amber-300 bg-amber-50 text-amber-800 font-bold hover:bg-amber-100 transition-colors disabled:opacity-50`}
+                    >
+                        <i className={`fa-solid ${saving ? 'fa-spinner fa-spin' : 'fa-hourglass-half'} mr-1.5`}></i>
+                        Chờ khách duyệt mẫu
+                    </button>
+                )}
+            </>
         );
     }
 

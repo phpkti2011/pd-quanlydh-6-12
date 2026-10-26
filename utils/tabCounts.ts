@@ -1,4 +1,5 @@
 import { Order } from '../types';
+import { isAwaitingApproval, isSampleApprovedAtPrint } from './sampleApproval';
 
 // Công thức đếm số trên badge của từng tab trạng thái / công đoạn.
 // Dùng CHUNG cho 2 tập dữ liệu, không được chép lại ở chỗ khác:
@@ -17,6 +18,8 @@ export function buildTabCounts(rows: Partial<Order>[]): Record<string, number> {
         xu_ly_file: normalOrders.filter((o: any) => o.status === 'XuLyFile').length,
         binh_file: normalOrders.filter((o: any) => o.status === 'BinhFile').length,
         in: normalOrders.filter((o: any) => o.status === 'In').length,
+        cho_duyet_mau: normalOrders.filter((o: any) => isAwaitingApproval(o)).length,
+        da_duyet_mau: normalOrders.filter((o: any) => isSampleApprovedAtPrint(o)).length,
         thanh_pham: normalOrders.filter((o: any) => o.status === 'ThanhPham').length,
         dong_goi: normalOrders.filter((o: any) => o.status === 'DongGoi').length,
         cho_giao_hang: normalOrders.filter((o: any) => o.status === 'ChoGiaoHang').length,

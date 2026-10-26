@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { UserRole } from '../types';
-import { REWORK_TAB } from '../constants';
+import { REWORK_TAB, SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB } from '../constants';
 
 interface StatusTabsProps {
     currentTab: string;
@@ -26,6 +26,8 @@ const COUNT_KEY_BY_LABEL: Record<string, string> = {
     'Xử lý File': 'xu_ly_file',
     'Bình File': 'binh_file',
     'In': 'in',
+    [SAMPLE_WAITING_TAB]: 'cho_duyet_mau',
+    [SAMPLE_APPROVED_TAB]: 'da_duyet_mau',
     'Thành Phẩm': 'thanh_pham',
     'Đóng gói': 'dong_goi',
     'Chờ giao hàng': 'cho_giao_hang',
@@ -52,7 +54,7 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         // First row: Primary workflow tabs
         const row1Labels = [
             "📊 Tổng quan", "Tất cả", "Xuất hóa đơn", "Nhận File", "Xử lý File",
-            "Bình File", "In", "Thành Phẩm", "Đóng gói", "Chờ giao hàng",
+            "Bình File", "In", SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB, "Thành Phẩm", "Đóng gói", "Chờ giao hàng",
             "Tạm ngưng", "Đã giao hàng"
         ];
 
@@ -166,6 +168,7 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         let activeBg = "bg-[#00796b]";
         if (tab.Key === "Xuất hóa đơn" && isActive) activeBg = "bg-[#e91e63]";
         if (tab.key === REWORK_TAB) activeBg = "bg-[#e65100]"; // cam: đơn sản xuất lại
+        if (tab.key === SAMPLE_WAITING_TAB) activeBg = "bg-amber-500"; // hổ phách: khớp chip CHỜ DUYỆT MẪU
 
         const activeClass = isActive
             ? `${activeBg} text-white shadow-md border-transparent`

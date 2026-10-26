@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { Order, OrderStatus, ReworkLink } from '../types';
-import { REWORK_TAB } from '../constants';
+import { REWORK_TAB, SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB } from '../constants';
 import { prevMonthRange } from '../utils/tabCounts';
 
 /**
@@ -318,6 +318,13 @@ export const orderService = {
                 case 'In': // Matched with UI "In"
                     query = query.eq('status', 'In');
                     break;
+                // Duyệt mẫu ở công đoạn In: phải khớp utils/sampleApproval.ts
+                case SAMPLE_WAITING_TAB:
+                    query = query.eq('awaiting_customer_approval', true).not('status', 'in', '("HoanThanh","Huy")');
+                    break;
+                case SAMPLE_APPROVED_TAB:
+                    query = query.eq('status', 'In').eq('awaiting_customer_approval', false).not('sample_approved_at', 'is', null);
+                    break;
                 case 'Thành Phẩm':
                     query = query.eq('status', 'ThanhPham');
                     break;
@@ -613,7 +620,7 @@ export const orderService = {
     async getAllOrderStatuses(filterMonth?: number, filterYear?: number) {
         let query = supabase
             .from('orders')
-            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status, rework_of_order_id');
+            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status, rework_of_order_id, awaiting_customer_approval, sample_approved_at');
 
         // Apply month filter
         if (filterMonth && filterYear) {
@@ -637,7 +644,7 @@ export const orderService = {
 
         const { data, error } = await supabase
             .from('orders')
-            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status, rework_of_order_id')
+            .select('id, status, is_urgent, vat_amount, invoice_status, has_design, design_status, has_large_print, large_print_status, has_be_demi, be_demi_status, has_gia_cong_ngoai, outsource_status, has_ep_kim, ep_kim_status, rework_of_order_id, awaiting_customer_approval, sample_approved_at')
             .gte('created_at', prevStart.toISOString())
             .lte('created_at', prevEnd.toISOString())
             .not('status', 'in', '("HoanThanh","Huy")');

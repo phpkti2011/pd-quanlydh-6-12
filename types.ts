@@ -130,6 +130,7 @@ export interface Order {
   // Chờ khách duyệt mẫu ở công đoạn In (xem alter_orders_add_awaiting_approval.sql)
   awaiting_customer_approval?: boolean;
   awaiting_approval_at?: string | null;
+  sample_approved_at?: string | null; // lúc khách duyệt mẫu (bấm "Đã duyệt"); NULL = chưa duyệt / đang chờ lại
 
   total_amount_pre_vat: number;
   vat_rate: number;

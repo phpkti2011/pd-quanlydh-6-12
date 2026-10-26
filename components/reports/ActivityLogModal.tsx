@@ -179,6 +179,7 @@ const ActivityLogModal: React.FC<Props> = ({ isOpen, onClose, initialOrderCode }
         'is_urgent': 'Đơn gấp',
         'awaiting_customer_approval': 'Chờ khách duyệt mẫu',
         'awaiting_approval_at': 'Thời điểm chờ duyệt mẫu',
+        'sample_approved_at': 'Thời điểm khách duyệt mẫu',
         'payment_confirmed': 'Đã xác nhận TT',
         'payment_confirmed_by': 'Người xác nhận TT',
         'payment_method_deposit': 'PT thanh toán cọc',

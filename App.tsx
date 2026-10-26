@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDebounce } from './hooks/useDebounce';
-import { COLORS, REWORK_TAB } from './constants';
+import { COLORS, REWORK_TAB, SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB } from './constants';
+import { isAwaitingApproval, isSampleApprovedAtPrint } from './utils/sampleApproval';
 import { orderService, buildReworkDraft } from './services/orderService';
 import { buildTabCounts, prevMonthLabel } from './utils/tabCounts';
 import { supabase } from './services/supabaseClient';
@@ -444,6 +445,10 @@ const App: React.FC = () => {
         }
         return order.status === targetStatus;
       }
+
+      // Duyệt mẫu ở công đoạn In — công thức ở utils/sampleApproval.ts
+      if (normalizedTab === SAMPLE_WAITING_TAB.normalize('NFC')) return isAwaitingApproval(order);
+      if (normalizedTab === SAMPLE_APPROVED_TAB.normalize('NFC')) return isSampleApprovedAtPrint(order);
 
       // ... existing special filters ...
       if (normalizedTab === 'Gấp') return order.is_urgent && order.status !== 'Huy' && order.status !== 'HoanThanh';
