@@ -11,6 +11,10 @@ type SampleFields = Pick<Partial<Order>, 'awaiting_customer_approval' | 'sample_
 export const isAwaitingApproval = (o: SampleFields) =>
     !!o.awaiting_customer_approval && o.status !== 'Huy' && o.status !== 'HoanThanh';
 
+/** Nút con "Chờ duyệt mẫu" của tab In: đang chờ khách duyệt VÀ đơn đang ở công đoạn In. */
+export const isAwaitingApprovalAtPrint = (o: SampleFields) =>
+    !!o.awaiting_customer_approval && o.status === 'In';
+
 /** Đã duyệt mẫu và đơn đang ở công đoạn In (sẵn sàng in). Sang công đoạn khác thì rời tab. */
 export const isSampleApprovedAtPrint = (o: SampleFields) =>
     o.status === 'In' && !o.awaiting_customer_approval && !!o.sample_approved_at;

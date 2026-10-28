@@ -26,8 +26,6 @@ const COUNT_KEY_BY_LABEL: Record<string, string> = {
     'Xử lý File': 'xu_ly_file',
     'Bình File': 'binh_file',
     'In': 'in',
-    [SAMPLE_WAITING_TAB]: 'cho_duyet_mau',
-    [SAMPLE_APPROVED_TAB]: 'da_duyet_mau',
     'Thành Phẩm': 'thanh_pham',
     'Đóng gói': 'dong_goi',
     'Chờ giao hàng': 'cho_giao_hang',
@@ -54,7 +52,7 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         // First row: Primary workflow tabs
         const row1Labels = [
             "📊 Tổng quan", "Tất cả", "Xuất hóa đơn", "Nhận File", "Xử lý File",
-            "Bình File", "In", SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB, "Thành Phẩm", "Đóng gói", "Chờ giao hàng",
+            "Bình File", "In", "Thành Phẩm", "Đóng gói", "Chờ giao hàng",
             "Tạm ngưng", "Đã giao hàng"
         ];
 
@@ -168,7 +166,6 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         let activeBg = "bg-[#00796b]";
         if (tab.Key === "Xuất hóa đơn" && isActive) activeBg = "bg-[#e91e63]";
         if (tab.key === REWORK_TAB) activeBg = "bg-[#e65100]"; // cam: đơn sản xuất lại
-        if (tab.key === SAMPLE_WAITING_TAB) activeBg = "bg-amber-500"; // hổ phách: khớp chip CHỜ DUYỆT MẪU
 
         const activeClass = isActive
             ? `${activeBg} text-white shadow-md border-transparent`
@@ -202,6 +199,13 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
             return [
                 { key: 'Chưa xuất', label: 'Chưa xuất' },
                 { key: 'Đã xuất', label: 'Đã xuất' }
+            ];
+        }
+        if (tabKey === 'In') {
+            return [
+                { key: 'Tất cả', label: 'Tất cả' },
+                { key: SAMPLE_WAITING_TAB, label: SAMPLE_WAITING_TAB },
+                { key: SAMPLE_APPROVED_TAB, label: SAMPLE_APPROVED_TAB }
             ];
         }
         if (tabKey === REWORK_TAB) {
@@ -240,9 +244,14 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
         // Determine Type (Pending or Completed)
         const isPending = subTab.key.startsWith('Chưa');
         const isCompleted = subTab.key.startsWith('Đã');
+        const isWaitingSample = subTab.key === SAMPLE_WAITING_TAB; // hổ phách: khớp chip CHỜ DUYỆT MẪU
+        const isAllSub = subTab.key === 'Tất cả';
 
         if (isActive) {
-            if (isPending) {
+            if (isWaitingSample) {
+                colorStyle = "bg-amber-50 text-amber-800 border-amber-300 ring-1 ring-amber-200";
+                icon = "fa-hourglass-half";
+            } else if (isPending) {
                 colorStyle = "bg-red-50 text-red-700 border-red-200 ring-1 ring-red-200";
                 icon = "fa-clock";
             } else if (isCompleted) {
@@ -250,12 +259,15 @@ const StatusTabs: React.FC<StatusTabsProps> = ({ currentTab, onTabChange, curren
                 icon = "fa-check-circle";
             } else {
                 colorStyle = "bg-gray-100 text-gray-800 border-gray-300"; // Fallback
+                if (isAllSub) icon = "fa-list";
             }
         } else {
             // Inactive State
             colorStyle = "bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:border-gray-300";
-            if (isPending) icon = "fa-clock";
+            if (isWaitingSample) icon = "fa-hourglass-half";
+            else if (isPending) icon = "fa-clock";
             if (isCompleted) icon = "fa-check-circle";
+            if (isAllSub) icon = "fa-list";
         }
 
         return (

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDebounce } from './hooks/useDebounce';
 import { COLORS, REWORK_TAB, SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB } from './constants';
-import { isAwaitingApproval, isSampleApprovedAtPrint } from './utils/sampleApproval';
+import { isAwaitingApprovalAtPrint, isSampleApprovedAtPrint } from './utils/sampleApproval';
 import { orderService, buildReworkDraft } from './services/orderService';
 import { buildTabCounts, prevMonthLabel } from './utils/tabCounts';
 import { supabase } from './services/supabaseClient';
@@ -262,6 +262,7 @@ const App: React.FC = () => {
     // If 'Xuất hóa đơn', default 'Chưa xuất'
     if (currentTab === 'Xuất hóa đơn') setCurrentSubTab('Chưa xuất');
     if (currentTab === REWORK_TAB) setCurrentSubTab('Chưa xong');
+    if (currentTab === 'In') setCurrentSubTab('Tất cả');
 
     const taskTabs = ['Thiết Kế', 'In Khổ Lớn', 'Bế Demi', 'Gia công ngoài', 'Ép Kim'];
     const normalizedTab = currentTab.normalize('NFC');
@@ -437,6 +438,14 @@ const App: React.FC = () => {
         return order.status === 'Moi' || order.status === 'TiepNhan' || order.status === 'NhanFile';
       }
 
+      // Tab In có nút con duyệt mẫu — công thức ở utils/sampleApproval.ts
+      if (normalizedTab === 'In') {
+        if (order.status !== 'In') return false;
+        if (currentSubTab === SAMPLE_WAITING_TAB) return isAwaitingApprovalAtPrint(order);
+        if (currentSubTab === SAMPLE_APPROVED_TAB) return isSampleApprovedAtPrint(order);
+        return true;
+      }
+
       // Handle direct map match
       if (statusMap[normalizedTab]) {
         const targetStatus = statusMap[normalizedTab];
@@ -445,10 +454,6 @@ const App: React.FC = () => {
         }
         return order.status === targetStatus;
       }
-
-      // Duyệt mẫu ở công đoạn In — công thức ở utils/sampleApproval.ts
-      if (normalizedTab === SAMPLE_WAITING_TAB.normalize('NFC')) return isAwaitingApproval(order);
-      if (normalizedTab === SAMPLE_APPROVED_TAB.normalize('NFC')) return isSampleApprovedAtPrint(order);
 
       // ... existing special filters ...
       if (normalizedTab === 'Gấp') return order.is_urgent && order.status !== 'Huy' && order.status !== 'HoanThanh';
@@ -553,8 +558,15 @@ const App: React.FC = () => {
       counts['Đã xong'] = relevant.filter(isDone).length;
     }
 
+    // Tab In: đếm cả tháng từ tabCounts (không bị cắt theo trang như `orders`)
+    if (normalizedTab === 'In') {
+      counts['Tất cả'] = tabCounts.in || 0;
+      counts[SAMPLE_WAITING_TAB] = tabCounts.cho_duyet_mau || 0;
+      counts[SAMPLE_APPROVED_TAB] = tabCounts.da_duyet_mau || 0;
+    }
+
     return counts;
-  }, [orders, currentTab]);
+  }, [orders, currentTab, tabCounts]);
 
   if (trackingCode) {
     return <TrackingPage token={trackingCode} />;

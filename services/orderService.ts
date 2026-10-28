@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { Order, OrderStatus, ReworkLink } from '../types';
-import { REWORK_TAB, SAMPLE_WAITING_TAB, SAMPLE_APPROVED_TAB } from '../constants';
+import { REWORK_TAB } from '../constants';
 import { prevMonthRange } from '../utils/tabCounts';
 
 /**
@@ -317,13 +317,6 @@ export const orderService = {
                     break;
                 case 'In': // Matched with UI "In"
                     query = query.eq('status', 'In');
-                    break;
-                // Duyệt mẫu ở công đoạn In: phải khớp utils/sampleApproval.ts
-                case SAMPLE_WAITING_TAB:
-                    query = query.eq('awaiting_customer_approval', true).not('status', 'in', '("HoanThanh","Huy")');
-                    break;
-                case SAMPLE_APPROVED_TAB:
-                    query = query.eq('status', 'In').eq('awaiting_customer_approval', false).not('sample_approved_at', 'is', null);
                     break;
                 case 'Thành Phẩm':
                     query = query.eq('status', 'ThanhPham');
