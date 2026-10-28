@@ -11,17 +11,17 @@ export interface VietQRParams {
 
 // Common banks in Vietnam for dropdown
 export const VIET_QR_BANKS = [
-    { id: 'MB', name: 'MBBank', logo: 'https://img.vietqr.io/image/MB-logo.png' },
-    { id: 'VCB', name: 'Vietcombank', logo: 'https://img.vietqr.io/image/VCB-logo.png' },
-    { id: 'TCB', name: 'Techcombank', logo: 'https://img.vietqr.io/image/TCB-logo.png' },
-    { id: 'ACB', name: 'ACB', logo: 'https://img.vietqr.io/image/ACB-logo.png' },
-    { id: 'VPB', name: 'VPBank', logo: 'https://img.vietqr.io/image/VPB-logo.png' },
-    { id: 'TPB', name: 'TPBank', logo: 'https://img.vietqr.io/image/TPB-logo.png' },
-    { id: 'BIDV', name: 'BIDV', logo: 'https://img.vietqr.io/image/BIDV-logo.png' },
-    { id: 'VIB', name: 'VIB', logo: 'https://img.vietqr.io/image/VIB-logo.png' },
-    { id: 'ICB', name: 'VietinBank', logo: 'https://img.vietqr.io/image/ICB-logo.png' },
-    { id: 'OCB', name: 'OCB', logo: 'https://img.vietqr.io/image/OCB-logo.png' },
-    { id: 'MSB', name: 'MSB', logo: 'https://img.vietqr.io/image/MSB-logo.png' }
+    { id: 'MB', name: 'MBBank', logo: 'https://img.vietqr.io/image/MB-logo.svg' },
+    { id: 'VCB', name: 'Vietcombank', logo: 'https://img.vietqr.io/image/VCB-logo.svg' },
+    { id: 'TCB', name: 'Techcombank', logo: 'https://img.vietqr.io/image/TCB-logo.svg' },
+    { id: 'ACB', name: 'ACB', logo: 'https://img.vietqr.io/image/ACB-logo.svg' },
+    { id: 'VPB', name: 'VPBank', logo: 'https://img.vietqr.io/image/VPB-logo.svg' },
+    { id: 'TPB', name: 'TPBank', logo: 'https://img.vietqr.io/image/TPB-logo.svg' },
+    { id: 'BIDV', name: 'BIDV', logo: 'https://img.vietqr.io/image/BIDV-logo.svg' },
+    { id: 'VIB', name: 'VIB', logo: 'https://img.vietqr.io/image/VIB-logo.svg' },
+    { id: 'ICB', name: 'VietinBank', logo: 'https://img.vietqr.io/image/ICB-logo.svg' },
+    { id: 'OCB', name: 'OCB', logo: 'https://img.vietqr.io/image/OCB-logo.svg' },
+    { id: 'MSB', name: 'MSB', logo: 'https://img.vietqr.io/image/MSB-logo.svg' }
 ];
 
 export const generateVietQRUrl = ({
@@ -39,6 +39,6 @@ export const generateVietQRUrl = ({
     const accName = accountName ? `&accountName=${encodeURIComponent(accountName)}` : '';
     const amt = amount && amount > 0 ? `&amount=${amount}` : '';
 
-    // Quick Link API Format: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<NAME>
-    return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?${amt}${addInfo}${accName}`;
+    // Quick Link API Format: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.svg?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<NAME>
+    return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.svg?${amt}${addInfo}${accName}`;
 };

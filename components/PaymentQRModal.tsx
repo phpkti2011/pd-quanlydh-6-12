@@ -25,6 +25,7 @@ export const PaymentQRModal: React.FC<PaymentQRModalProps> = ({ isOpen, onClose,
     const [paymentType, setPaymentType] = useState<PaymentType>('deposit');
     const [customAmount, setCustomAmount] = useState<number>(0);
     const [showConfig, setShowConfig] = useState(false);
+    const [qrFailedUrl, setQrFailedUrl] = useState('');
 
     // Random Code State (Persisted)
     const [randomCode, setRandomCode] = useState<string>('');
@@ -237,13 +238,21 @@ export const PaymentQRModal: React.FC<PaymentQRModalProps> = ({ isOpen, onClose,
                                                 />
                                             )}
                                             <div className="bg-white p-2 border rounded-lg shadow-sm relative group-hover:shadow-md transition-shadow">
-                                                <img
-                                                    src={qrUrl}
-                                                    alt="QR Code"
-                                                    className="w-48 h-48 object-contain"
-                                                    id="qr-image"
-                                                    crossOrigin="anonymous"
-                                                />
+                                                {qrFailedUrl === qrUrl ? (
+                                                    <div className="w-48 h-48 flex flex-col items-center justify-center text-center text-sm text-red-600 gap-2">
+                                                        <i className="fa-solid fa-triangle-exclamation text-2xl"></i>
+                                                        Không tải được mã QR. Kiểm tra mạng hoặc cấu hình tài khoản rồi thử lại.
+                                                    </div>
+                                                ) : (
+                                                    <img
+                                                        src={qrUrl}
+                                                        alt="QR Code"
+                                                        className="w-48 h-48 object-contain"
+                                                        id="qr-image"
+                                                        crossOrigin="anonymous"
+                                                        onError={() => setQrFailedUrl(qrUrl)}
+                                                    />
+                                                )}
 
                                                 {/* Copy Overlay */}
                                                 <button
