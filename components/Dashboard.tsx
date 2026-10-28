@@ -29,8 +29,6 @@ const COLORS = {
 
 const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#e91e63', '#607d8b'];
 
-/** Vai trò được xem lịch sử đơn — giữ đúng như nút "Lịch sử HĐ" ở App.tsx, không nới thêm. */
-const HISTORY_ROLES = ['Admin', 'KeToan', 'QuanLySanXuat'];
 
 interface DashboardProps {
   /** { ...session.user, role } — OrderCard phân quyền thao tác theo trường này */
@@ -111,8 +109,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, onEditOrder, onRewor
   };
 
   const handleViewHistory = (orderCode: string) => {
-    // Giữ đúng quyền của nút "Lịch sử HĐ" trên thanh công cụ, không nới thêm
-    if (!HISTORY_ROLES.includes(currentUser?.role)) {
+    // Mọi nhân viên xem được lịch sử TỪNG ĐƠN (CSDL: get_activity_logs). Khách thì không.
+    // Nút "Lịch sử HĐ" (nhật ký toàn hệ thống) vẫn chỉ Admin/KeToan/QuanLySanXuat.
+    if (currentUser?.role === 'Khach') {
       alert('Bạn không có quyền xem lịch sử đơn hàng.');
       return;
     }

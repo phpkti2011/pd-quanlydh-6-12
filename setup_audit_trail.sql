@@ -512,11 +512,27 @@ AS $$
         FROM public.user_logs ul
         LEFT JOIN public.profiles p ON p.id = ul.user_id
         WHERE
-            -- SECURITY DEFINER bỏ qua RLS nên phải tự kiểm tra quyền ở đây
-            EXISTS (
-                SELECT 1 FROM public.profiles me
-                WHERE me.id = auth.uid()
-                  AND me.role::text IN ('Admin', 'KeToan', 'QuanLySanXuat')
+            -- SECURITY DEFINER bỏ qua RLS nên phải tự kiểm tra quyền ở đây:
+            --   * Admin / KeToan / QuanLySanXuat: xem toàn bộ nhật ký.
+            --   * Mọi nhân viên khác (trừ 'Khach'): CHỈ xem lịch sử của MỘT đơn,
+            --     bắt buộc truyền p_entity_id và khớp CHÍNH XÁC mã đơn (không tiền tố,
+            --     không để trống) để không dò được nhật ký toàn hệ thống.
+            (
+                EXISTS (
+                    SELECT 1 FROM public.profiles me
+                    WHERE me.id = auth.uid()
+                      AND me.role::text IN ('Admin', 'KeToan', 'QuanLySanXuat')
+                )
+                OR (
+                    EXISTS (
+                        SELECT 1 FROM public.profiles me
+                        WHERE me.id = auth.uid()
+                          AND me.role::text <> 'Khach'
+                    )
+                    AND p_entity_id IS NOT NULL
+                    AND ul.entity_type = 'order'
+                    AND ul.entity_id = p_entity_id
+                )
             )
             AND (p_user_id     IS NULL OR ul.user_id     = p_user_id)
             AND (p_action_type IS NULL OR ul.action_type = p_action_type)
