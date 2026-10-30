@@ -100,6 +100,8 @@ BEGIN
     WITH participated_tasks AS (
         SELECT
             p.full_name,
+            -- Chỉ NHÂN VIÊN SẢN XUẤT bị trừ sai hỏng. Mọi vị trí khác không bị trừ.
+            (p.role::TEXT = 'NhanVienSanXuat') AS is_deductible,
             COALESCE(p.competency_score, 1.0) AS score,
             -- Không có key trong JSON  =>  0. KHÔNG lấy mức chung (commission_policies) nữa.
             -- Lỗi cũ: COALESCE(..., cp_proc.rate, 0) khiến khâu "chưa cấu hình" âm thầm
@@ -164,6 +166,7 @@ BEGIN
                     THEN (pt.total_amount_pre_vat / pt.participant_count) * (pt.subtask_rate / 100.0)
                 ELSE 0
             END AS raw_stage,
+            pt.is_deductible,
             FALSE AS is_manager
         FROM participated_tasks pt
 
@@ -179,6 +182,7 @@ BEGIN
             1::BIGINT          AS participant_count,
             o.total_amount_pre_vat * (p.product_manager_commission_rate / 100.0) AS raw_process,
             0::NUMERIC         AS raw_stage,
+            FALSE              AS is_deductible,  -- quản lý sản xuất không bị trừ
             TRUE               AS is_manager
         FROM orders o
         CROSS JOIN profiles p
@@ -210,16 +214,17 @@ BEGIN
 
     -- Gộp theo NGƯỜI: trùng tên chỉ tính 1, gộp cả dòng công đoạn lẫn dòng quản lý
     per_person AS (
-        SELECT rg.full_name, SUM(rg.gross_total) AS person_total
+        SELECT rg.full_name, SUM(rg.gross_total) AS person_total,
+               BOOL_OR(rg.is_deductible) AS is_deductible
         FROM rows_gross rg
         GROUP BY rg.full_name
     ),
 
-    -- Số người có thưởng và phần trừ mỗi người
+    -- Số NHÂN VIÊN SẢN XUẤT có thưởng và phần trừ mỗi người (vị trí khác không chia)
     share AS (
         SELECT
-            CASE WHEN COUNT(*) FILTER (WHERE pp.person_total > 0) > 0
-                 THEN FLOOR(v_deduct_total / COUNT(*) FILTER (WHERE pp.person_total > 0))
+            CASE WHEN COUNT(*) FILTER (WHERE pp.is_deductible AND pp.person_total > 0) > 0
+                 THEN FLOOR(v_deduct_total / COUNT(*) FILTER (WHERE pp.is_deductible AND pp.person_total > 0))
                  ELSE 0
             END AS per_share
         FROM per_person pp
@@ -243,7 +248,9 @@ BEGIN
         SELECT
             c.*,
             -- Chặn ở 0: không bao giờ trừ quá phần thưởng của chính dòng đó
-            GREATEST(0, LEAST(c.gross_total, c.per_share - c.cum_before)) AS deduct_val
+            CASE WHEN c.is_deductible
+                 THEN GREATEST(0, LEAST(c.gross_total, c.per_share - c.cum_before))
+                 ELSE 0 END AS deduct_val
         FROM consumed c
     )
 

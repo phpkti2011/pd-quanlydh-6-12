@@ -26,6 +26,7 @@ Repo có nhiều file `fix_*.sql` cùng định nghĩa một hàm. Ai chạy fil
 - **Không giữ 2 bản logic song song** (SQL và TypeScript) cho cùng một việc.
 - Doanh số tháng cho mốc thưởng sản xuất chỉ tính ở **một** hàm `production_revenue_in_period()` (`setup_rework_orders.sql`), đã trừ chi phí đơn sản xuất lại. `get_production_commission_summary` và `get_staff_commission_rows` gọi hàm đó — **đừng chép lại đoạn `SUM(total_amount_pre_vat)`** vào hàm nào nữa.
 - **Thưởng nhóm NVKD chỉ tính ở một hàm** `calculate_sales_commission()` (`update_sales_commission_completed_at.sql`). Cổng là chỉ tiêu doanh số CHƯA VAT ở Thiết lập KPI (`sales_targets`, dòng Sales, không có thì Company). Đạt thì quỹ = doanh số nhóm × %, chia đôi: nửa theo tỉ lệ doanh số, nửa theo tỉ lệ số đơn (không tính đơn sản xuất lại). Bảng `GROUP_TIER` không còn dùng. `fix_commission_transition.sql` và `fix_kpi_staff_commission.sql` có bản cũ của hàm này, **đừng chạy lại**.
+- **Khoản trừ sai hỏng chỉ trừ vị trí `NhanVienSanXuat`.** Thiết kế, bình file, quản lý sản xuất, admin, kế toán, kinh doanh không bị trừ và không được đếm vào số người chia. Quy tắc nằm ở `get_staff_commission_rows` (cờ `is_deductible`); `DefectDeductionTab.tsx` chỉ đọc `deduction_amount`, đừng chia lại ở TypeScript. Hàm này có trong `setup_rework_orders.sql`, `setup_production_defect_deduction.sql`, `fix_stage_rate_no_fallback.sql`: sửa cả ba.
 
 ## Đơn sản xuất lại (`rework_of_order_id IS NOT NULL`)
 

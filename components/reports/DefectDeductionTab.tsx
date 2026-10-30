@@ -58,18 +58,18 @@ export const DefectDeductionTab: React.FC<Props> = ({
 
     const split = useMemo(() => {
         if (!sameMonthAsReport) return null;
-        // Trùng tên chỉ tính là 1 nhân viên, gộp cả dòng công đoạn lẫn dòng Quản lý SX
-        const byPerson = new Map<string, number>();
+        // KHÔNG tự chia lại ở đây: ai thuộc diện bị trừ (chỉ Nhân viên sản xuất) và bị trừ
+        // bao nhiêu do CSDL quyết định (get_staff_commission_rows). Màn này chỉ đọc kết quả
+        // ở deduction_amount, nên không thể lệch với báo cáo. Trùng tên tính là 1 người.
+        const paid = new Map<string, number>();
         for (const r of results) {
-            const gross = (Number(r.total_comm) || 0) + (Number(r.deduction_amount) || 0);
-            byPerson.set(r.participant_name, (byPerson.get(r.participant_name) || 0) + gross);
+            const d = Number(r.deduction_amount) || 0;
+            if (d > 0) paid.set(r.participant_name, (paid.get(r.participant_name) || 0) + d);
         }
-        const earners = Array.from(byPerson.values()).filter(v => v > 0);
-        const n = earners.length;
+        const n = paid.size;
         if (n === 0) return { n: 0, perPerson: 0, actual: 0 };
         const perPerson = Math.floor(totalDeduct / n);
-        // Chặn ở 0, không chia lại: mỗi người chỉ trừ được tối đa bằng thưởng của họ
-        const actual = earners.reduce((s, v) => s + Math.min(perPerson, v), 0);
+        const actual = Array.from(paid.values()).reduce((s, v) => s + v, 0);
         return { n, perPerson, actual };
     }, [sameMonthAsReport, results, totalDeduct]);
 
@@ -115,7 +115,8 @@ export const DefectDeductionTab: React.FC<Props> = ({
                     <i className="fa-solid fa-lock mr-1"></i> Chỉ Admin nhìn thấy mục này
                 </div>
                 <div className="text-xs mt-1">
-                    Khoản trừ được chia <b>đều</b> cho các nhân viên sản xuất có thưởng trong tháng, và
+                    Khoản trừ được chia <b>đều</b> cho các <b>Nhân viên sản xuất</b> có thưởng trong tháng
+                    (thiết kế, bình file, quản lý sản xuất, admin, kế toán, kinh doanh không bị trừ), và
                     ăn dần vào hoa hồng từng đơn tính từ đơn mới nhất. Nhân viên chỉ thấy số tiền sau khi
                     trừ, không thấy khoản trừ này.
                 </div>
@@ -261,7 +262,7 @@ export const DefectDeductionTab: React.FC<Props> = ({
                         <>
                             <div className="text-purple-900">
                                 Tổng trừ <b>{fmt(totalDeduct)}đ</b>
-                                {' · '}<b>{split.n}</b> người có thưởng
+                                {' · '}<b>{split.n}</b> nhân viên sản xuất bị trừ
                                 {' · '}mỗi người <b>{fmt(split.perPerson)}đ</b>
                                 {' · '}thực trừ được <b>{fmt(split.actual)}đ</b>
                             </div>
