@@ -57,7 +57,7 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
             // 1. Fetch All Required Data (Orders, Policies, Profiles, Customers, Target)
             const ordersPromise = supabase
                 .from('orders')
-                .select('id, sales_rep_id, total_amount, status, created_at, rework_of_order_id')
+                .select('id, sales_rep_id, total_amount, total_amount_pre_vat, vat_amount, status, created_at, rework_of_order_id')
                 .gte('created_at', `${start}T00:00:00`)
                 .lte('created_at', `${end}T23:59:59`);
 
@@ -141,9 +141,13 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                 s.total_created_count++;
 
                 if (o.status !== 'Huy') {
-                    s.total_sales += o.total_amount || 0;
+                    // Chỉ tiêu KPI và các mốc hoa hồng đều nhập CHƯA VAT (xem KPIManager),
+                    // nên doanh số đem so cũng phải chưa VAT. Dùng total_amount ở đây sẽ
+                    // thổi số "Thực đạt" thêm 8-10% VAT.
+                    const preVat = o.total_amount_pre_vat ?? ((o.total_amount || 0) - (o.vat_amount || 0));
+                    s.total_sales += preVat;
                     s.valid_orders_count++;
-                    if ((o.total_amount || 0) > s.max_val) s.max_val = o.total_amount;
+                    if (preVat > s.max_val) s.max_val = preVat;
                     s.active_days.add(new Date(o.created_at).toDateString());
                 }
             });
@@ -323,11 +327,11 @@ const SalesEvaluationModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
                         <div className="bg-white p-3 rounded border">
-                            <div className="text-gray-500 text-sm">Chỉ tiêu (Target)</div>
+                            <div className="text-gray-500 text-sm">Chỉ tiêu (Target) · chưa VAT</div>
                             <div className="text-xl font-bold text-gray-800">{deptTarget.toLocaleString('vi-VN')} đ</div>
                         </div>
                         <div className="bg-white p-3 rounded border">
-                            <div className="text-gray-500 text-sm">Thực đạt (Actual)</div>
+                            <div className="text-gray-500 text-sm">Thực đạt (Actual) · chưa VAT</div>
                             <div className={`text-xl font-bold ${deptTotalSales >= deptTarget ? 'text-green-600' : 'text-indigo-600'}`}>
                                 {deptTotalSales.toLocaleString('vi-VN')} đ
                             </div>
