@@ -180,9 +180,20 @@ const SalesCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                     </table>
                 </div>
 
-                {results.length > 0 && <div className="mt-4 text-xs text-gray-500 italic flex gap-4">
-                    <div>* Doanh số nhóm: <span className="font-bold text-gray-700">{results[0]?.group_sales_total?.toLocaleString('vi-VN')} đ</span></div>
-                    <div>* Quỹ thưởng nhóm: <span className="font-bold text-gray-700">{results[0]?.group_bonus_fund?.toLocaleString('vi-VN')} đ</span></div>
+                {results.length > 0 && <div className="mt-4 text-xs text-gray-500 italic flex flex-wrap gap-x-4 gap-y-1">
+                    <div>* Doanh số nhóm (chưa VAT): <span className="font-bold text-gray-700">{Math.round(results[0]?.group_sales_total || 0).toLocaleString('vi-VN')} đ</span></div>
+                    {results[0]?.group_target !== undefined && (
+                        <div>* Chỉ tiêu nhóm: <span className="font-bold text-gray-700">
+                            {(results[0].group_target || 0) > 0 ? `${Math.round(results[0].group_target || 0).toLocaleString('vi-VN')} đ` : 'Chưa nhập'}
+                        </span>
+                            {(results[0].group_target || 0) > 0 && (
+                                (results[0].group_sales_total || 0) >= (results[0].group_target || 0)
+                                    ? <span className="ml-1 font-bold text-green-600 not-italic">· Đạt</span>
+                                    : <span className="ml-1 font-bold text-red-600 not-italic">· Chưa đạt (không có thưởng nhóm)</span>
+                            )}
+                        </div>
+                    )}
+                    <div>* Quỹ thưởng nhóm: <span className="font-bold text-gray-700">{Math.round(results[0]?.group_bonus_fund || 0).toLocaleString('vi-VN')} đ</span></div>
                 </div>}
 
                 <div className="mt-6 border-t border-gray-100 pt-4 text-xs text-gray-500">
@@ -197,7 +208,9 @@ const SalesCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                     <h4 className="font-bold text-gray-700 mb-2 uppercase">Công thức tính thưởng:</h4>
                     <div className="space-y-1">
                         <p><strong className="text-gray-900">1. Hoa hồng Cá nhân:</strong> Doanh số hoàn thành × % Hoa hồng (Theo bậc thang cá nhân)</p>
-                        <p><strong className="text-gray-900">2. Thưởng Nhóm:</strong> (Doanh số cá nhân / Tổng DS nhóm) × Quỹ thưởng nhóm</p>
+                        <p><strong className="text-gray-900">2. Thưởng Nhóm:</strong> chỉ có khi doanh số nhóm (chưa VAT) đạt chỉ tiêu ở Thiết lập KPI. Quỹ = Doanh số nhóm × % thưởng, chia đôi:</p>
+                        <p className="pl-4">- Khoảng 1: (Quỹ ÷ 2) × (Doanh số cá nhân ÷ Doanh số nhóm)</p>
+                        <p className="pl-4">- Khoảng 2: (Quỹ ÷ 2) × (Số đơn cá nhân ÷ Số đơn nhóm)</p>
                     </div>
                 </div>
 
@@ -360,23 +373,52 @@ const SalesCommissionModal: React.FC<Props> = ({ isOpen, onClose, currentUserRol
                                     </h4>
                                     <div className="bg-blue-50 rounded border border-blue-100 p-4 text-sm space-y-2">
                                         <div className="flex justify-between">
-                                            <span className="text-gray-600">Tổng doanh số nhóm:</span>
-                                            <span className="font-bold">{selectedItem.group_sales_total?.toLocaleString()} đ</span>
+                                            <span className="text-gray-600">Tổng doanh số nhóm (chưa VAT):</span>
+                                            <span className="font-bold">{Math.round(selectedItem.group_sales_total || 0).toLocaleString('vi-VN')} đ</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-gray-600">Quỹ thưởng nhóm ({(selectedItem as any).group_rate || 0}%):</span>
-                                            <span className="font-bold text-blue-600">
-                                                {((selectedItem as any).group_bonus_fund || 0).toLocaleString()} đ
+                                            <span className="text-gray-600">Chỉ tiêu nhóm:</span>
+                                            <span className="font-bold">
+                                                {(selectedItem.group_target || 0) > 0
+                                                    ? `${Math.round(selectedItem.group_target || 0).toLocaleString('vi-VN')} đ`
+                                                    : 'Chưa nhập'}
+                                                {(selectedItem.group_target || 0) > 0 && (
+                                                    (selectedItem.group_sales_total || 0) >= (selectedItem.group_target || 0)
+                                                        ? <span className="ml-2 text-green-600">Đạt</span>
+                                                        : <span className="ml-2 text-red-600">Chưa đạt</span>
+                                                )}
                                             </span>
                                         </div>
-                                        <div className="border-t border-blue-200 my-2 pt-2">
-                                            <div className="text-gray-600 mb-1">Công thức chia sẻ:</div>
-                                            <div className="font-mono text-xs bg-white p-2 rounded border text-center text-gray-700">
-                                                ({selectedItem.personal_sales?.toLocaleString()} / {selectedItem.group_sales_total?.toLocaleString()}) × {(selectedItem as any).group_bonus_fund?.toLocaleString()}
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Quỹ thưởng nhóm ({selectedItem.group_rate || 0}% doanh số nhóm):</span>
+                                            <span className="font-bold text-blue-600">
+                                                {Math.round(selectedItem.group_bonus_fund || 0).toLocaleString('vi-VN')} đ
+                                            </span>
+                                        </div>
+                                        <div className="border-t border-blue-200 my-2 pt-2 space-y-3">
+                                            <div>
+                                                <div className="text-gray-600 mb-1">Khoảng 1: chia theo doanh số (một nửa quỹ)</div>
+                                                <div className="font-mono text-xs bg-white p-2 rounded border text-center text-gray-700">
+                                                    ({Math.round(selectedItem.group_bonus_fund || 0).toLocaleString('vi-VN')} ÷ 2) × ({Math.round(selectedItem.personal_sales || 0).toLocaleString('vi-VN')} ÷ {Math.round(selectedItem.group_sales_total || 0).toLocaleString('vi-VN')})
+                                                </div>
+                                                <div className="flex justify-between mt-1 font-bold text-blue-700">
+                                                    <span>Khoảng 1:</span>
+                                                    <span>{Math.round(selectedItem.group_comm_sales || 0).toLocaleString('vi-VN')} đ</span>
+                                                </div>
                                             </div>
-                                            <div className="flex justify-between mt-2 font-bold text-base text-blue-700">
-                                                <span>Thực nhận:</span>
-                                                <span>{selectedItem.group_comm?.toLocaleString()} đ</span>
+                                            <div>
+                                                <div className="text-gray-600 mb-1">Khoảng 2: chia theo số đơn (một nửa quỹ)</div>
+                                                <div className="font-mono text-xs bg-white p-2 rounded border text-center text-gray-700">
+                                                    ({Math.round(selectedItem.group_bonus_fund || 0).toLocaleString('vi-VN')} ÷ 2) × ({selectedItem.completed_order_count || 0} ÷ {selectedItem.group_order_count || 0} đơn)
+                                                </div>
+                                                <div className="flex justify-between mt-1 font-bold text-blue-700">
+                                                    <span>Khoảng 2:</span>
+                                                    <span>{Math.round(selectedItem.group_comm_orders || 0).toLocaleString('vi-VN')} đ</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between font-bold text-base text-blue-700 border-t border-blue-200 pt-2">
+                                                <span>Thực nhận (khoảng 1 + khoảng 2):</span>
+                                                <span>{Math.round(selectedItem.group_comm || 0).toLocaleString('vi-VN')} đ</span>
                                             </div>
                                         </div>
                                     </div>

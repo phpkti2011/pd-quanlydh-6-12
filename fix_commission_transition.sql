@@ -289,6 +289,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- 4. Sales Commission with correct param signature + transition logic
+-- CẢNH BÁO: bản calculate_sales_commission dưới đây đã bị THAY THẾ bởi
+-- update_sales_commission_completed_at.sql (thưởng nhóm theo chỉ tiêu KPI, chia đôi
+-- doanh số/số đơn). ĐỪNG chạy lại đoạn này. Chỉ sửa sang doanh số chưa VAT để lỡ chạy nhầm không sai số.
 CREATE OR REPLACE FUNCTION calculate_sales_commission(
     p_start_date DATE, p_end_date DATE, p_sales_rep_name TEXT DEFAULT NULL
 )
@@ -310,14 +313,14 @@ DECLARE
 BEGIN
     -- Group total sales
     IF v_is_new_method THEN
-        SELECT COALESCE(SUM(total_amount), 0) INTO v_group_total_sales
+        SELECT COALESCE(SUM(total_amount_pre_vat), 0) INTO v_group_total_sales
         FROM orders
         WHERE completed_at IS NOT NULL
           AND completed_at::DATE >= p_start_date AND completed_at::DATE <= p_end_date
           AND status = 'HoanThanh'
           AND created_at >= '2026-03-01'::TIMESTAMPTZ;
     ELSE
-        SELECT COALESCE(SUM(total_amount), 0) INTO v_group_total_sales
+        SELECT COALESCE(SUM(total_amount_pre_vat), 0) INTO v_group_total_sales
         FROM orders
         WHERE created_at::DATE >= p_start_date AND created_at::DATE <= p_end_date
           AND status = 'HoanThanh';
@@ -343,7 +346,7 @@ BEGIN
         SELECT 
             o.sales_rep_id, p.full_name,
             COALESCE(st.commission_tiers, p.commission_tiers) as effective_tiers,
-            COALESCE(SUM(o.total_amount), 0) as total_sales,
+            COALESCE(SUM(o.total_amount_pre_vat), 0) as total_sales,
             -- Đơn sản xuất lại không tính vào số đơn (setup_rework_orders.sql)
             COUNT(o.id) FILTER (WHERE o.rework_of_order_id IS NULL) as order_count
         FROM orders o

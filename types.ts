@@ -201,6 +201,10 @@ export interface SalesCommissionResult {
   active_days: number;
   group_rate?: number;
   group_bonus_fund?: number;
+  group_target?: number;            // Chỉ tiêu doanh số nhóm (chưa VAT), 0 = chưa nhập
+  group_order_count?: number;       // Tổng số đơn hoàn thành của nhóm
+  group_comm_sales?: number;        // Thưởng nhóm khoảng 1: chia theo doanh số
+  group_comm_orders?: number;       // Thưởng nhóm khoảng 2: chia theo số đơn
 }
 
 export interface StaffCommissionResult {
