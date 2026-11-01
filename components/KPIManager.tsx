@@ -14,7 +14,7 @@ interface KPIManagerProps {
 // (Removed CommissionPolicy interface as we are moving to sales_targets)
 
 const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'employees' | 'company' | 'production'>('employees');
+    const [activeTab, setActiveTab] = useState<'employees' | 'sales' | 'company' | 'production'>('employees');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -109,6 +109,27 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
                     upsertData.push(upsertRow);
                 }
             });
+        } else if (activeTab === 'sales') {
+            // Bảng hoa hồng NVKD: ghi mốc của từng NVKD, giữ nguyên chỉ tiêu cá nhân
+            for (const emp of employees.filter(e => e.role === 'NhanVienKinhDoanh')) {
+                const tiers = commissionTiers[emp.id];
+                if (!tiers) continue;
+                const { errors } = validateTiers(tiers);
+                if (errors.length) {
+                    alert(`${emp.full_name}: ${errors[0]}`);
+                    setLoading(false);
+                    return;
+                }
+                upsertData.push({
+                    entity_type: 'user',
+                    entity_id: emp.id,
+                    period_month: selectedMonth,
+                    period_year: selectedYear,
+                    target_amount: targets[emp.id]?.target || 0,
+                    commission_rate: 0,
+                    commission_tiers: [...tiers].sort((a, b) => a.min - b.min)
+                });
+            }
         } else {
             // Company & Dept
             ['Company', 'Sales'].forEach(dept => {
@@ -272,6 +293,12 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
                             Nhân viên
                         </button>
                         <button
+                            onClick={() => setActiveTab('sales')}
+                            className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'sales' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                            Kinh doanh
+                        </button>
+                        <button
                             onClick={() => setActiveTab('company')}
                             className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'company' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
                         >
@@ -300,6 +327,8 @@ const KPIManager: React.FC<KPIManagerProps> = ({ isOpen, onClose }) => {
                 <div className="flex-1 overflow-auto p-6">
                     {activeTab === 'production' ? (
                         <ProductionTierTab month={selectedMonth} year={selectedYear} copyTrigger={productionCopyTrigger} />
+                    ) : activeTab === 'sales' ? (
+                        <SalesTierTable employees={employees} commissionTiers={commissionTiers} setCommissionTiers={setCommissionTiers} />
                     ) : activeTab === 'employees' ? (
                         <table className="w-full text-sm">
                             <thead className="bg-gray-100 text-gray-600 border-b">
@@ -842,6 +871,126 @@ const ProductionTierTab: React.FC<{ month: number; year: number; copyTrigger?: n
             <p className="text-xs text-gray-500 italic text-right">
                 <strong>Mốc chung</strong> là lưới an toàn: tháng nào chưa cấu hình riêng sẽ tự dùng bộ mốc chung này.
             </p>
+        </div>
+    );
+};
+
+// Bảng cấu hình hoa hồng NVKD: mỗi NVKD một dòng, sửa mốc trực tiếp (tab "Kinh doanh")
+type SalesTier = { min: number; max: number; rate: number; note?: string };
+
+// Mốc sai (errors) chặn lưu; mốc lệch (warnings) chỉ cảnh báo.
+// max = 0 nghĩa là không giới hạn, chỉ hợp lệ ở mốc cuối.
+const validateTiers = (tiers: SalesTier[]): { errors: string[]; warnings: string[] } => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const sorted = [...tiers].sort((a, b) => a.min - b.min);
+    sorted.forEach((t, i) => {
+        const isLast = i === sorted.length - 1;
+        if (t.rate < 0) errors.push(`Mốc ${i + 1}: % hoa hồng không được âm`);
+        if (t.max > 0 && t.min >= t.max) errors.push(`Mốc ${i + 1}: "Từ" phải nhỏ hơn "Đến"`);
+        if (!isLast && !(t.max > 0)) errors.push(`Mốc ${i + 1}: mốc không giới hạn (∞) chỉ được đặt ở mốc cuối`);
+        if (!isLast && t.max > 0) {
+            const next = sorted[i + 1];
+            if (next.min < t.max) warnings.push(`Mốc ${i + 1} và ${i + 2} chồng nhau`);
+            else if (next.min > t.max) warnings.push(`Có khoảng hở giữa mốc ${i + 1} và ${i + 2}`);
+        }
+    });
+    return { errors, warnings };
+};
+
+const SalesTierTable: React.FC<{
+    employees: Profile[];
+    commissionTiers: Record<string, any[]>;
+    setCommissionTiers: React.Dispatch<React.SetStateAction<Record<string, any[]>>>;
+}> = ({ employees, commissionTiers, setCommissionTiers }) => {
+    const reps = employees.filter(e => e.role === 'NhanVienKinhDoanh');
+    const hasOwn = (emp: Profile) => commissionTiers[emp.id] !== undefined;
+    const tiersOf = (emp: Profile): SalesTier[] => (commissionTiers[emp.id] ?? emp.commission_tiers ?? []) as SalesTier[];
+    const setTiers = (emp: Profile, next: SalesTier[]) => setCommissionTiers(prev => ({ ...prev, [emp.id]: next }));
+    const updateTier = (emp: Profile, index: number, field: keyof SalesTier, value: number) =>
+        setTiers(emp, tiersOf(emp).map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+    const addTier = (emp: Profile) => {
+        const cur = tiersOf(emp);
+        const lastMax = cur.length ? Math.max(...cur.map(t => t.max || 0)) : 0;
+        setTiers(emp, [...cur, { min: lastMax, max: 0, rate: 0, note: '' }]);
+    };
+    const removeTier = (emp: Profile, index: number) => setTiers(emp, tiersOf(emp).filter((_, i) => i !== index));
+
+    if (reps.length === 0) {
+        return <p className="text-sm text-gray-500 italic">Chưa có nhân viên kinh doanh nào.</p>;
+    }
+
+    return (
+        <div>
+            <p className="text-sm text-gray-500 italic mb-3">
+                Mỗi nhân viên kinh doanh một dòng. Nhập các mốc Doanh số (Chưa VAT) và % hoa hồng, để trống ô "Đến" ở mốc cuối nghĩa là không giới hạn. Bấm "Lưu Cấu Hình" để áp dụng cho tháng đang chọn.
+            </p>
+            <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-600 border-b">
+                    <tr>
+                        <th className="px-4 py-3 text-left w-48">Nhân viên</th>
+                        <th className="px-4 py-3 text-left">Mốc hoa hồng (Từ → Đến, %)</th>
+                        <th className="px-4 py-3 text-center w-20">Số mốc</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y text-gray-700">
+                    {reps.map(emp => {
+                        const tiers = tiersOf(emp);
+                        const { errors, warnings } = validateTiers(tiers);
+                        return (
+                            <tr key={emp.id} className="align-top hover:bg-blue-50">
+                                <td className="px-4 py-3">
+                                    <div className="font-medium text-gray-800">{emp.full_name}</div>
+                                    {!hasOwn(emp) && (
+                                        <div className="text-xs text-gray-400 mt-1">Đang dùng mặc định từ hồ sơ</div>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3">
+                                    <div className="space-y-2">
+                                        {tiers.map((tier, index) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    className="w-36 border rounded px-2 py-1 text-right focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={tier.min}
+                                                    onChange={e => updateTier(emp, index, 'min', Number(e.target.value) || 0)}
+                                                />
+                                                <i className="fa-solid fa-arrow-right text-gray-400"></i>
+                                                <input
+                                                    type="number"
+                                                    className="w-36 border rounded px-2 py-1 text-right focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    placeholder="∞"
+                                                    value={tier.max || ''}
+                                                    onChange={e => updateTier(emp, index, 'max', Number(e.target.value) || 0)}
+                                                />
+                                                <input
+                                                    type="number" step="0.1"
+                                                    className="w-20 border rounded px-2 py-1 text-center font-bold text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                    value={tier.rate}
+                                                    onChange={e => updateTier(emp, index, 'rate', Number(e.target.value) || 0)}
+                                                />
+                                                <span className="text-gray-500 font-bold">%</span>
+                                                <button onClick={() => removeTier(emp, index)} className="text-red-400 hover:text-red-600 px-1" title="Xóa mốc">
+                                                    <i className="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {tiers.length === 0 && (
+                                            <div className="text-xs text-gray-400">Chưa có mốc nào: hoa hồng cá nhân sẽ bằng 0.</div>
+                                        )}
+                                        <button onClick={() => addTier(emp)} className="text-xs px-2.5 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100 font-medium">
+                                            <i className="fa-solid fa-plus"></i> Thêm mốc
+                                        </button>
+                                        {errors.map((m, i) => <div key={'e' + i} className="text-xs text-red-600">{m}</div>)}
+                                        {warnings.map((m, i) => <div key={'w' + i} className="text-xs text-amber-600">{m}</div>)}
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 text-center text-gray-500">{tiers.length}</td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 };
