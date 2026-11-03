@@ -7,7 +7,6 @@ import { orderService, buildReworkDraft } from './services/orderService';
 import { buildTabCounts, prevMonthLabel } from './utils/tabCounts';
 import { supabase } from './services/supabaseClient';
 import { authService } from './services/auth';
-import { dashboardService } from './services/dashboardService';
 import { Order, OrderStatus } from './types';
 import Dashboard from './components/Dashboard';
 import OrderList from './components/OrderList';
@@ -63,7 +62,6 @@ const App: React.FC = () => {
   const ITEMS_PER_PAGE = 50;
 
   // Stats temporarily disabled or need new service
-  const [stats, setStats] = useState<any>(null);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   // Số đơn tháng LIỀN TRƯỚC còn chưa xong, hiện thành số xanh trên tab
   const [carryOverCounts, setCarryOverCounts] = useState<Record<string, number>>({});
@@ -233,10 +231,6 @@ const App: React.FC = () => {
       ]);
       setTabCounts(buildTabCounts(monthRows));
       setCarryOverCounts(buildTabCounts(prevMonthRows));
-
-      // 3. Keep fetching Dashboard Stats if needed for other charts (revenue etc), but don't overwrite tabCounts
-      const dashboardStats = await dashboardService.getStats('month');
-      setStats(dashboardStats);
 
     } catch (error) {
       console.error("Failed to fetch data", error);
