@@ -1,6 +1,8 @@
 
 -- ==============================================================================
 -- 1. RPC: Get Debt Orders (Cong No)
+-- BẢN CŨ — bản đúng ở fix_debt_remaining_calc.sql (kiểu trả về khác, chạy
+-- lại đoạn này sẽ báo lỗi "cannot change return type").
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION get_debt_orders()
 RETURNS TABLE (

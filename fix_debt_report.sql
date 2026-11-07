@@ -1,3 +1,5 @@
+-- BẢN CŨ — ĐỪNG CHẠY LẠI. Thiếu điều kiện loại đơn Hủy, tính sai Còn nợ.
+-- Bản đúng: fix_debt_remaining_calc.sql
 DROP FUNCTION IF EXISTS get_debt_orders();
 
 CREATE OR REPLACE FUNCTION get_debt_orders()

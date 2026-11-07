@@ -2,6 +2,10 @@
 -- Nguyên nhân: COALESCE(remaining_amount, total-deposit) trả về 0 khi
 -- remaining_amount lưu sai = 0 (không null). Sửa: với DaCoc luôn tính
 -- remaining = total - deposit để khớp với điều kiện WHERE.
+--
+-- ĐÂY LÀ BẢN ĐÚNG DUY NHẤT của get_debt_orders(). fix_debt_report.sql và
+-- update_finance_reports.sql có bản cũ — đừng chạy lại.
+-- 07/11/2026: loại đơn Hủy (status = 'Huy') khỏi công nợ.
 
 DROP FUNCTION IF EXISTS get_debt_orders();
 
@@ -43,8 +47,12 @@ AS $$
   LEFT JOIN customers c ON o.customer_id = c.id
   LEFT JOIN profiles u ON o.sales_rep_id = u.id
   WHERE
-    o.payment_status = 'CongNo'
-    OR
-    (o.payment_status = 'DaCoc' AND (o.total_amount - COALESCE(o.deposit_amount, 0)) > 0)
+    -- Đơn Hủy không còn là công nợ (bản fix_debt_report.sql làm mất điều kiện này)
+    o.status::text <> 'Huy'
+    AND (
+      o.payment_status = 'CongNo'
+      OR
+      (o.payment_status = 'DaCoc' AND (o.total_amount - COALESCE(o.deposit_amount, 0)) > 0)
+    )
   ORDER BY o.created_at DESC;
 $$;

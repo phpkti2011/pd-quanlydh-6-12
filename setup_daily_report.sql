@@ -158,6 +158,7 @@ BEGIN
             'debt_orders', (
                 SELECT COUNT(*) FROM orders
                 WHERE payment_status::text = 'CongNo'
+                AND status::text != 'Huy'
             )
         )
     ) INTO v_result;
